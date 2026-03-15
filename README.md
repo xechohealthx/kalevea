@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Kalevea
 
-## Getting Started
+Kalevea is a production-grade **multi-tenant SaaS/PWA operations platform** for a treatment-network MSO.
 
-First, run the development server:
+Kalevea is **not an EMR**. It’s the operating system around the EMR for clinic onboarding, provider/staff management, operational support, documents, training, auditability, and modular engines (starting with **REMS MVP**).
+
+## Getting started (local dev)
+
+### Prereqs
+
+- Node.js + npm
+- PostgreSQL
+
+### Environment
+
+Create `.env`:
+
+- `DATABASE_URL=postgresql://...`
+- `NEXTAUTH_SECRET=...` (any long random string for local dev)
+
+### Database + seed
+
+```bash
+npm run db:push
+npm run db:seed
+```
+
+### Run the app
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Dev login
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use any seeded demo account with password: `password`
 
-## Learn More
+- `superadmin@kalevea.local`
+- `exec@kalevea.local`
+- `impl@kalevea.local`
+- `support@kalevea.local`
+- `billing@kalevea.local`
+- `compliance@kalevea.local`
+- `clinicadmin@northside.local`
+- `provider@lakeshore.local`
+- `readonly@riverside.local`
 
-To learn more about Next.js, take a look at the following resources:
+## Docs
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `kalevea_context.md`
+- `docs/architecture/kalevea-core.md`
+- `docs/architecture/rems-mvp.md`
+- `docs/product/kalevea-mvp-modules.md`

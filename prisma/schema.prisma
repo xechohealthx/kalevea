@@ -1,13 +1,816 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
+  engineType = "binary"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum OrganizationType {
+  MSO
+  CLINIC_ORG
+}
+
+enum ClinicType {
+  PRIMARY_CARE
+  PSYCHIATRY
+  HOSPITAL_OUTPATIENT
+  SPECIALTY
+}
+
+enum ClinicStatus {
+  PROSPECT
+  ONBOARDING
+  ACTIVE
+  PAUSED
+}
+
+enum RoleScope {
+  GLOBAL
+  ORGANIZATION
+  CLINIC
+}
+
+enum ProviderStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClinicOnboardingProjectStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETE
+}
+
+enum OnboardingTaskCategory {
+  LEGAL
+  BILLING
+  REMS
+  TRAINING
+  OPERATIONS
+  TECHNICAL
+}
+
+enum OnboardingTaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum SupportTicketCategory {
+  BILLING
+  PA
+  TRAINING
+  COMPLIANCE
+  TECHNICAL
+  GENERAL
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum TrainingLessonContentType {
+  TEXT
+  VIDEO
+  PDF
+  LINK
+}
+
+enum TrainingAssignmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+}
+
+enum DocumentCategory {
+  CONTRACT
+  ONBOARDING
+  TRAINING
+  COMPLIANCE
+  SUPPORT
+  GENERAL
+}
+
+enum WorkTaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum WorkTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RemsEnrollmentStatus {
+  NOT_ENROLLED
+  PENDING
+  ENROLLED
+  SUSPENDED
+  EXPIRED
+}
+
+enum RemsAppliesToType {
+  CLINIC
+  PROVIDER
+}
+
+enum RemsRequirementType {
+  DOCUMENT
+  TRAINING
+  ATTESTATION
+  OTHER
+}
+
+model Organization {
+  id        String           @id @default(cuid())
+  name      String
+  slug      String
+  type      OrganizationType
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  clinics   Clinic[]
+  documents Document[]
+  auditLogs AuditLog[]
+  orgRoles  UserOrganizationRole[]
+
+  notes         Note[]
+  attachments   FileAttachment[]
+  activityEvents ActivityEvent[]
+  workTasks     WorkTask[]
+  statusEvents  StatusEvent[]
+
+  remsClinicEnrollments   ClinicRemsEnrollment[]
+  remsProviderEnrollments ProviderRemsEnrollment[]
+  remsRequirements        RemsRequirement[]
+  remsAttestations        RemsAttestation[]
+
+  @@unique([slug])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Clinic {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  clinicType     ClinicType
+  status         ClinicStatus @default(PROSPECT)
+
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String?      @default("US")
+
+  phone          String?
+  email          String?
+  timezone       String       @default("America/New_York")
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providers      Provider[]
+  staffProfiles  StaffProfile[]
+  onboarding     ClinicOnboardingProject?
+  supportTickets SupportTicket[]
+  assignments    TrainingAssignment[]
+  documents      Document[]
+  auditLogs      AuditLog[]
+  clinicRoles    UserClinicRole[]
+
+  notes         Note[]
+  attachments   FileAttachment[]
+  activityEvents ActivityEvent[]
+  workTasks     WorkTask[]
+  statusEvents  StatusEvent[]
+
+  remsEnrollments         ClinicRemsEnrollment[]
+  remsProviderEnrollments ProviderRemsEnrollment[]
+  remsRequirements        RemsRequirement[]
+  remsAttestations        RemsAttestation[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([status])
+  @@index([clinicType])
+  @@index([createdAt])
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  firstName String
+  lastName  String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  credential         UserCredential?
+  orgRoles           UserOrganizationRole[]
+  clinicRoles        UserClinicRole[]
+  staffProfiles      StaffProfile[]
+  ownedOnboarding    ClinicOnboardingProject[] @relation("OnboardingOwner")
+  onboardingAssigned OnboardingTask[]          @relation("OnboardingAssignee")
+  createdTickets     SupportTicket[]           @relation("SupportTicketCreatedBy")
+  assignedTickets    SupportTicket[]           @relation("SupportTicketAssignedTo")
+  ticketComments     SupportTicketComment[]
+  uploadedDocuments  Document[]
+  auditLogs          AuditLog[]                @relation("AuditActor")
+
+  notesCreated        Note[]            @relation("NoteCreatedBy")
+  attachmentsCreated  FileAttachment[]  @relation("FileAttachmentCreatedBy")
+  activityCreated     ActivityEvent[]   @relation("ActivityEventCreatedBy")
+  workTasksCreated    WorkTask[]        @relation("WorkTaskCreatedBy")
+  workTasksUpdated    WorkTask[]        @relation("WorkTaskUpdatedBy")
+  workTasksAssigned   WorkTask[]        @relation("WorkTaskAssignedTo")
+  statusEventsChanged StatusEvent[]     @relation("StatusEventChangedBy")
+
+  remsClinicEnrollmentsCreated   ClinicRemsEnrollment[]   @relation("RemsClinicEnrollmentCreatedBy")
+  remsClinicEnrollmentsUpdated   ClinicRemsEnrollment[]   @relation("RemsClinicEnrollmentUpdatedBy")
+  remsProviderEnrollmentsCreated ProviderRemsEnrollment[] @relation("RemsProviderEnrollmentCreatedBy")
+  remsProviderEnrollmentsUpdated ProviderRemsEnrollment[] @relation("RemsProviderEnrollmentUpdatedBy")
+  remsAttestations               RemsAttestation[]        @relation("RemsAttestedBy")
+
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+/// Dev/local auth only. Replaceable by production auth later.
+model UserCredential {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id    String    @id @default(cuid())
+  key   String    @unique
+  name  String
+  scope RoleScope
+
+  orgGrants   UserOrganizationRole[]
+  clinicGrants UserClinicRole[]
+
+  @@index([scope])
+}
+
+model UserOrganizationRole {
+  id             String @id @default(cuid())
+  userId         String
+  organizationId String
+  roleId         String
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, organizationId, roleId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model UserClinicRole {
+  id       String @id @default(cuid())
+  userId   String
+  clinicId String
+  roleId   String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, clinicId, roleId])
+  @@index([clinicId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model Provider {
+  id          String         @id @default(cuid())
+  clinicId    String
+  firstName   String
+  lastName    String
+  credentials String?
+  specialty   String?
+  npi         String?
+  email       String?
+  phone       String?
+  status      ProviderStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  assignments TrainingAssignment[]
+  remsEnrollments ProviderRemsEnrollment[]
+  remsAttestations RemsAttestation[]
+
+  @@index([clinicId])
+  @@index([status])
+  @@index([npi])
+  @@index([createdAt])
+}
+
+model StaffProfile {
+  id        String      @id @default(cuid())
+  clinicId  String
+  userId    String?
+  firstName String
+  lastName  String
+  title     String?
+  email     String?
+  phone     String?
+  status    StaffStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignments TrainingAssignment[]
+
+  @@index([clinicId])
+  @@index([userId])
+  @@index([status])
+}
+
+model ClinicOnboardingProject {
+  id               String                      @id @default(cuid())
+  clinicId         String                      @unique
+  status           ClinicOnboardingProjectStatus @default(NOT_STARTED)
+  ownerUserId      String?
+  targetGoLiveDate DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  owner  User?  @relation("OnboardingOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  tasks  OnboardingTask[]
+
+  @@index([status])
+  @@index([ownerUserId])
+  @@index([createdAt])
+}
+
+model OnboardingTask {
+  id             String              @id @default(cuid())
+  projectId      String
+  category       OnboardingTaskCategory
+  title          String
+  description    String?
+  status         OnboardingTaskStatus @default(TODO)
+  assignedUserId String?
+  dueDate        DateTime?
+  sortOrder      Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  project  ClinicOnboardingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?                   @relation("OnboardingAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([category])
+  @@index([assignedUserId])
+  @@index([dueDate])
+}
+
+model SupportTicket {
+  id              String             @id @default(cuid())
+  clinicId        String
+  createdByUserId String?
+  category        SupportTicketCategory
+  priority        SupportTicketPriority @default(MEDIUM)
+  status          SupportTicketStatus   @default(OPEN)
+  subject         String
+  description     String
+  assignedToUserId String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  clinic     Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  createdBy  User?  @relation("SupportTicketCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  assignedTo User?  @relation("SupportTicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  comments   SupportTicketComment[]
+
+  @@index([clinicId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model SupportTicketComment {
+  id         String   @id @default(cuid())
+  ticketId   String
+  userId     String?
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([createdAt])
+}
+
+model TrainingCourse {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  category    String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons     TrainingLesson[]
+  assignments TrainingAssignment[]
+
+  @@index([isPublished])
+  @@index([createdAt])
+}
+
+model TrainingLesson {
+  id          String                  @id @default(cuid())
+  courseId    String
+  title       String
+  sortOrder   Int                     @default(0)
+  contentType TrainingLessonContentType
+  content     String
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  course TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([sortOrder])
+}
+
+model TrainingAssignment {
+  id             String                 @id @default(cuid())
+  clinicId        String
+  providerId     String?
+  staffProfileId String?
+  courseId       String
+  status         TrainingAssignmentStatus @default(NOT_STARTED)
+  assignedAt     DateTime               @default(now())
+  completedAt    DateTime?
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  provider     Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  staffProfile StaffProfile? @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
+  course       TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@index([courseId])
+  @@index([status])
+  @@index([providerId])
+  @@index([staffProfileId])
+}
+
+model Document {
+  id              String          @id @default(cuid())
+  organizationId  String?
+  clinicId        String?
+  category        DocumentCategory
+  title           String
+  storageKey      String
+  mimeType        String
+  fileSize        Int
+  uploadedByUserId String?
+  createdAt       DateTime        @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  uploadedBy   User?         @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  attachments FileAttachment[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model Note {
+  id             String   @id @default(cuid())
+  organizationId String
+  clinicId       String?
+  parentType     String
+  parentId       String
+  body           String
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("NoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([parentType, parentId])
+  @@index([organizationId, parentType, parentId])
+  @@index([createdAt])
+}
+
+model FileAttachment {
+  id             String   @id @default(cuid())
+  organizationId String
+  clinicId       String?
+  parentType     String
+  parentId       String
+  documentId     String
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  document     Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("FileAttachmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([parentType, parentId])
+  @@index([documentId])
+  @@index([createdAt])
+}
+
+model ActivityEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  clinicId       String?
+  parentType     String
+  parentId       String
+  type           String
+  title          String
+  description    String?
+  metadata       Json?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ActivityEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([parentType, parentId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model WorkTask {
+  id             String           @id @default(cuid())
+  organizationId String
+  clinicId       String?
+  parentType     String
+  parentId       String
+  title          String
+  description    String?
+  status         WorkTaskStatus   @default(TODO)
+  priority       WorkTaskPriority?
+  assignedToId   String?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  createdById    String
+  updatedById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("WorkTaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User?        @relation("WorkTaskUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  assignedTo   User?        @relation("WorkTaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([parentType, parentId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([dueAt])
+  @@index([createdAt])
+}
+
+model StatusEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  clinicId       String?
+  parentType     String
+  parentId       String
+  fromStatus     String?
+  toStatus       String
+  note           String?
+  changedById    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  changedBy    User?        @relation("StatusEventChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([parentType, parentId])
+  @@index([toStatus])
+  @@index([createdAt])
+}
+
+model RemsProgram {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinicEnrollments   ClinicRemsEnrollment[]
+  providerEnrollments ProviderRemsEnrollment[]
+  requirements        RemsRequirement[]
+  attestations        RemsAttestation[]
+
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model ClinicRemsEnrollment {
+  id            String               @id @default(cuid())
+  organizationId String
+  clinicId      String
+  remsProgramId String
+  status        RemsEnrollmentStatus @default(PENDING)
+  enrolledAt    DateTime?
+  expiresAt     DateTime?
+  lastReviewedAt DateTime?
+  notes         String?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  program      RemsProgram  @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("RemsClinicEnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?        @relation("RemsClinicEnrollmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  attestations RemsAttestation[]
+
+  @@unique([clinicId, remsProgramId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([remsProgramId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model ProviderRemsEnrollment {
+  id            String               @id @default(cuid())
+  organizationId String
+  clinicId      String
+  providerId    String
+  remsProgramId String
+  status        RemsEnrollmentStatus @default(PENDING)
+  enrolledAt    DateTime?
+  expiresAt     DateTime?
+  lastReviewedAt DateTime?
+  notes         String?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  provider     Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  program      RemsProgram  @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("RemsProviderEnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?        @relation("RemsProviderEnrollmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  attestations RemsAttestation[]
+
+  @@unique([providerId, remsProgramId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([providerId])
+  @@index([remsProgramId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model RemsRequirement {
+  id             String             @id @default(cuid())
+  organizationId String?
+  clinicId       String?
+  remsProgramId  String
+  appliesToType  RemsAppliesToType
+  title          String
+  description    String?
+  requirementType RemsRequirementType
+  isRequired     Boolean            @default(true)
+  sortOrder      Int                @default(0)
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  program      RemsProgram   @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  attestations RemsAttestation[]
+
+  @@index([remsProgramId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([appliesToType])
+  @@index([requirementType])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([createdAt])
+}
+
+model RemsAttestation {
+  id                      String   @id @default(cuid())
+  organizationId          String
+  clinicId                String
+  remsProgramId           String
+  remsRequirementId       String?
+  providerId              String?
+  clinicRemsEnrollmentId  String?
+  providerRemsEnrollmentId String?
+  title                   String
+  attestedById            String
+  attestedAt              DateTime @default(now())
+  notes                   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  program      RemsProgram  @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  requirement  RemsRequirement? @relation(fields: [remsRequirementId], references: [id], onDelete: SetNull)
+  provider     Provider?    @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  clinicEnrollment  ClinicRemsEnrollment?  @relation(fields: [clinicRemsEnrollmentId], references: [id], onDelete: SetNull)
+  providerEnrollment ProviderRemsEnrollment? @relation(fields: [providerRemsEnrollmentId], references: [id], onDelete: SetNull)
+  attestedBy   User         @relation("RemsAttestedBy", fields: [attestedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([remsProgramId])
+  @@index([remsRequirementId])
+  @@index([providerId])
+  @@index([attestedAt])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  clinicId       String?
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  actor        User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
 }
