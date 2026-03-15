@@ -10,6 +10,8 @@ import { AddClinicDialog } from "@/components/clinics/add-clinic-dialog";
 import { clinicFilterSchema, listClinics } from "@/server/services/clinics/clinic.service";
 import { getAccessSnapshot } from "@/server/services/auth/auth.service";
 
+type ClinicRow = Awaited<ReturnType<typeof listClinics>>[number];
+
 function StatusBadge({ status }: { status: string }) {
   const variant: BadgeProps["variant"] =
     status === "ACTIVE"
@@ -103,7 +105,7 @@ export default async function ClinicsPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clinics.map((c) => (
+              {clinics.map((c: ClinicRow) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
                     <Link className="hover:underline" href={`/clinics/${c.id}`}>
