@@ -1,0 +1,22 @@
+---
+description: Kalevea UI system enforcement
+globs: ["app/**/*.tsx", "components/**/*.tsx"]
+alwaysApply: true
+-----------------
+
+Follow the Kalevea UI system.
+
+Reference docs:
+
+* docs/design/kalevea-ui-system.md
+* docs/architecture/frontend-ui-architecture.md
+* AGENTS.md
+
+Rules:
+
+* Prefer shared components from components/system.
+* Avoid module-specific UI duplication.
+* Use Tailwind consistently.
+* Maintain accessibility and keyboard navigation.
+* Avoid generic dashboard styling.
+* Prefer workspace layouts and entity panels.

@@ -2,26 +2,32 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth/server";
-import { Badge } from "@/components/ui/badge";
-import type { BadgeProps } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddClinicDialog } from "@/components/clinics/add-clinic-dialog";
+import { WorkspaceHeader } from "@/components/system/layout/workspace-header";
+import { StatusBadge, type StatusTone } from "@/components/system/data-display/status-badge";
+import { EntityTable, type EntityTableColumn } from "@/components/system/data-display/entity-table";
+import { EntityPanel } from "@/components/system/entity/entity-panel";
+import { EmptyState } from "@/components/system/feedback/empty-state";
+import { FilterBar } from "@/components/system/forms/filter-bar";
 import { clinicFilterSchema, listClinics } from "@/server/services/clinics/clinic.service";
 import { getAccessSnapshot } from "@/server/services/auth/auth.service";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type ClinicRow = Awaited<ReturnType<typeof listClinics>>[number];
 
-function StatusBadge({ status }: { status: string }) {
-  const variant: BadgeProps["variant"] =
-    status === "ACTIVE"
-      ? "success"
-      : status === "ONBOARDING"
-        ? "warning"
-        : status === "PAUSED"
-          ? "danger"
-          : "secondary";
-  return <Badge variant={variant}>{status}</Badge>;
+function toClinicStatusTone(status: string): StatusTone {
+  if (status === "ACTIVE") return "success";
+  if (status === "ONBOARDING") return "warning";
+  if (status === "PAUSED") return "danger";
+  return "neutral";
+}
+
+function formatClinicType(type: string) {
+  return type
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export default async function ClinicsPage({
@@ -40,102 +46,105 @@ export default async function ClinicsPage({
 
   const access = await getAccessSnapshot(session.user.id);
   const clinics = await listClinics({ actorUserId: session.user.id }, filter);
+  const activeClinics = clinics.filter((clinic) => clinic.status === "ACTIVE").length;
+  const onboardingClinics = clinics.filter((clinic) => clinic.status === "ONBOARDING").length;
+  const pausedClinics = clinics.filter((clinic) => clinic.status === "PAUSED").length;
+
+  const clinicColumns: Array<EntityTableColumn<ClinicRow>> = [
+    {
+      id: "clinic",
+      header: "Clinic",
+      cell: (clinic) => (
+        <div>
+          <Link className="font-medium hover:underline" href={`/clinics/${clinic.id}`}>
+            {clinic.name}
+          </Link>
+          <div className="text-xs text-zinc-500 dark:text-zinc-400">{clinic.slug}</div>
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (clinic) => <StatusBadge label={clinic.status} tone={toClinicStatusTone(clinic.status)} />,
+    },
+    {
+      id: "type",
+      header: "Type",
+      cell: (clinic) => formatClinicType(clinic.clinicType),
+    },
+    {
+      id: "location",
+      header: "Location",
+      cell: (clinic) => (clinic.city ? `${clinic.city}, ${clinic.state ?? ""}`.trim() : "—"),
+    },
+    {
+      id: "organization",
+      header: "Organization",
+      cell: (clinic) => <span className="text-sm text-zinc-600 dark:text-zinc-400">{clinic.organization.name}</span>,
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Clinics</h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage clinic workspaces and onboarding status.
-          </p>
-        </div>
-        {access.defaultOrganizationId ? (
-          <AddClinicDialog organizationId={access.defaultOrganizationId} />
-        ) : null}
-      </div>
+      <WorkspaceHeader
+        title="Clinics"
+        description="Manage clinic workspaces, operational status, and onboarding progression across your organization scope."
+        scopeLabel="Clinic workspace index"
+        actions={access.defaultOrganizationId ? <AddClinicDialog organizationId={access.defaultOrganizationId} /> : null}
+      />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Clinic directory</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form className="grid gap-3 md:grid-cols-4" action="/clinics" method="get">
-            <input
-              name="q"
-              defaultValue={filter.q ?? ""}
-              placeholder="Search clinics…"
-              className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+      <FilterBar
+        left={
+          <>
+            <StatusBadge label={`${clinics.length} clinics`} tone="neutral" />
+            <StatusBadge label={`${activeClinics} active`} tone="success" />
+            <StatusBadge label={`${onboardingClinics} onboarding`} tone="warning" />
+            <StatusBadge label={`${pausedClinics} paused`} tone={pausedClinics > 0 ? "danger" : "neutral"} />
+          </>
+        }
+      />
+
+      <EntityPanel title="Clinic directory" subtitle="Filter and navigate clinic operational workspaces by status and type.">
+        <form className="grid gap-3 md:grid-cols-4" action="/clinics" method="get">
+          <Input name="q" defaultValue={filter.q ?? ""} placeholder="Search clinics..." />
+          <select
+            name="status"
+            defaultValue={filter.status ?? ""}
+            className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <option value="">All statuses</option>
+            <option value="PROSPECT">Prospect</option>
+            <option value="ONBOARDING">Onboarding</option>
+            <option value="ACTIVE">Active</option>
+            <option value="PAUSED">Paused</option>
+          </select>
+          <select
+            name="clinicType"
+            defaultValue={filter.clinicType ?? ""}
+            className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <option value="">All types</option>
+            <option value="PRIMARY_CARE">Primary Care</option>
+            <option value="PSYCHIATRY">Psychiatry</option>
+            <option value="HOSPITAL_OUTPATIENT">Hospital Outpatient</option>
+            <option value="SPECIALTY">Specialty</option>
+          </select>
+          <Button type="submit">Apply</Button>
+        </form>
+
+        <EntityTable
+          columns={clinicColumns}
+          rows={clinics}
+          getRowKey={(clinic) => clinic.id}
+          emptyState={
+            <EmptyState
+              title="No clinics match your filters"
+              description="Adjust status, type, or search terms to broaden the workspace directory results."
             />
-            <select
-              name="status"
-              defaultValue={filter.status ?? ""}
-              className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <option value="">All statuses</option>
-              <option value="PROSPECT">Prospect</option>
-              <option value="ONBOARDING">Onboarding</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PAUSED">Paused</option>
-            </select>
-            <select
-              name="clinicType"
-              defaultValue={filter.clinicType ?? ""}
-              className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <option value="">All types</option>
-              <option value="PRIMARY_CARE">Primary Care</option>
-              <option value="PSYCHIATRY">Psychiatry</option>
-              <option value="HOSPITAL_OUTPATIENT">Hospital Outpatient</option>
-              <option value="SPECIALTY">Specialty</option>
-            </select>
-            <button className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900">
-              Apply
-            </button>
-          </form>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Clinic</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Org</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clinics.map((c: ClinicRow) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    <Link className="hover:underline" href={`/clinics/${c.id}`}>
-                      {c.name}
-                    </Link>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400">{c.slug}</div>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={c.status} />
-                  </TableCell>
-                  <TableCell>{c.clinicType}</TableCell>
-                  <TableCell>
-                    {c.city ? `${c.city}, ${c.state ?? ""}`.trim() : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {c.organization.name}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {clinics.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-zinc-500">
-                    No clinics match your filters.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          }
+        />
+      </EntityPanel>
     </div>
   );
 }

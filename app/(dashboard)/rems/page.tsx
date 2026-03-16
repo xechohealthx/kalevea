@@ -3,210 +3,347 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth/server";
 import { Badge } from "@/components/ui/badge";
-import type { BadgeProps } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { WorkspaceHeader } from "@/components/system/layout/workspace-header";
+import { MetricCard } from "@/components/system/data-display/metric-card";
+import {
+  EntityTable,
+  type EntityTableColumn,
+} from "@/components/system/data-display/entity-table";
+import { StatusBadge, type StatusTone } from "@/components/system/data-display/status-badge";
+import { EntityPanel } from "@/components/system/entity/entity-panel";
+import { Timeline } from "@/components/system/workflow/timeline";
+import { EmptyState } from "@/components/system/feedback/empty-state";
+import { FilterBar } from "@/components/system/forms/filter-bar";
+import { RemsDashboardFilters } from "@/components/rems/rems-dashboard-filters";
 import { getRemsDashboard } from "@/server/services/rems/rems.service";
 
-function StatusBadge({ status }: { status: string | null }) {
-  const v: BadgeProps["variant"] =
-    status === "ENROLLED"
-      ? "success"
-      : status === "PENDING"
-        ? "warning"
-        : status === "EXPIRED"
-          ? "danger"
-          : status === "SUSPENDED"
-            ? "secondary"
-            : "outline";
-  return <Badge variant={v}>{status ?? "—"}</Badge>;
+function toRemsTone(status: string | null): StatusTone {
+  if (status === "ENROLLED") return "success";
+  if (status === "PENDING") return "warning";
+  if (status === "EXPIRED") return "danger";
+  if (status === "SUSPENDED") return "info";
+  return "neutral";
 }
 
-function MetricCard(props: { title: string; value: string | number; subtitle?: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-          {props.title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-semibold tracking-tight">{props.value}</div>
-        {props.subtitle ? (
-          <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {props.subtitle}
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
+function getSingleSearchParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
 }
 
-export default async function RemsIndexPage() {
+function normalizedEnrollment(status: string | null): string {
+  return status ?? "NOT_ENROLLED";
+}
+
+function getClinicReadinessPercent(clinic: {
+  clinicAttestedCount: number;
+  providerAttestedCount: number;
+  clinicAttestableCount: number;
+  providerAttestableCount: number;
+}): number {
+  const denom = clinic.clinicAttestableCount + clinic.providerAttestableCount;
+  const numer = clinic.clinicAttestedCount + clinic.providerAttestedCount;
+  return denom > 0 ? Math.round((numer / denom) * 100) : 0;
+}
+
+function isUpcomingWithin30Days(dateValue: Date | string | null): boolean {
+  if (!dateValue) return false;
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() + 30);
+  return date >= now && date <= cutoff;
+}
+
+function isExpiredDate(dateValue: Date | string | null): boolean {
+  if (!dateValue) return false;
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  return date < new Date();
+}
+
+export default async function RemsIndexPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const dashboard = await getRemsDashboard({ actorUserId: session.user.id });
+  const query = getSingleSearchParam(searchParams?.q).trim();
+  const enrollment = getSingleSearchParam(searchParams?.enrollment).toUpperCase() || "all";
+  const readiness = getSingleSearchParam(searchParams?.readiness).toLowerCase() || "all";
+  const expiration = getSingleSearchParam(searchParams?.expiration).toLowerCase() || "all";
+  const queryLower = query.toLowerCase();
+
+  const filteredClinics = dashboard.clinics.filter((clinic) => {
+    const matchesQuery = !query
+      ? true
+      : clinic.clinicName.toLowerCase().includes(queryLower);
+    const enrollmentValue = normalizedEnrollment(clinic.status);
+    const matchesEnrollment = enrollment === "all" ? true : enrollmentValue === enrollment;
+    const readinessPct = getClinicReadinessPercent(clinic);
+    const matchesReadiness =
+      readiness === "all" ||
+      (readiness === "complete" && readinessPct === 100) ||
+      (readiness === "watch" && readinessPct >= 60 && readinessPct < 100) ||
+      (readiness === "at-risk" && readinessPct < 60);
+    const matchesExpiration =
+      expiration === "all" ||
+      (expiration === "upcoming" && isUpcomingWithin30Days(clinic.expiresAt)) ||
+      (expiration === "expired" &&
+        (normalizedEnrollment(clinic.status) === "EXPIRED" || isExpiredDate(clinic.expiresAt)));
+
+    return matchesQuery && matchesEnrollment && matchesReadiness && matchesExpiration;
+  });
+
+  const filteredClinicIds = new Set(filteredClinics.map((clinic) => clinic.clinicId));
+
+  const filteredProviders = dashboard.providerSnapshot.filter((provider) => {
+    const matchesClinicFilter = filteredClinicIds.size === 0 ? false : filteredClinicIds.has(provider.clinicId);
+    if (!matchesClinicFilter) return false;
+    const matchesQuery = !query
+      ? true
+      : provider.providerName.toLowerCase().includes(queryLower) ||
+        provider.clinicName.toLowerCase().includes(queryLower);
+    const providerEnrollment = normalizedEnrollment(provider.enrollmentStatus);
+    const matchesEnrollment = enrollment === "all" ? true : providerEnrollment === enrollment;
+    const matchesExpiration =
+      expiration === "all" ||
+      (expiration === "upcoming" && isUpcomingWithin30Days(provider.expiresAt)) ||
+      (expiration === "expired" &&
+        (providerEnrollment === "EXPIRED" || isExpiredDate(provider.expiresAt)));
+
+    return matchesQuery && matchesEnrollment && matchesExpiration;
+  });
+
+  const filteredUpcomingExpirations = dashboard.upcomingExpirations.filter((expirationRow) => {
+    if (!filteredClinicIds.has(expirationRow.clinicId)) return false;
+    if (!query) return true;
+    const combined = `${expirationRow.clinicName} ${expirationRow.providerName ?? ""}`.toLowerCase();
+    return combined.includes(queryLower);
+  });
+
+  const totalAttested = filteredClinics.reduce(
+    (acc, clinic) => acc + clinic.clinicAttestedCount + clinic.providerAttestedCount,
+    0,
+  );
+  const totalAttestable = filteredClinics.reduce(
+    (acc, clinic) => acc + clinic.clinicAttestableCount + clinic.providerAttestableCount,
+    0,
+  );
+  const networkReadinessPct = totalAttestable > 0 ? Math.round((totalAttested / totalAttestable) * 100) : 0;
+
+  const clinicColumns: Array<EntityTableColumn<(typeof dashboard.clinics)[number]>> = [
+    {
+      id: "clinic",
+      header: "Clinic",
+      cell: (row) => (
+        <Link className="font-medium hover:underline" href={`/rems/clinics/${row.clinicId}`}>
+          {row.clinicName}
+        </Link>
+      ),
+    },
+    {
+      id: "enrollment",
+      header: "Enrollment",
+      cell: (row) => (
+        <StatusBadge
+          label={row.status ?? "NOT_ENROLLED"}
+          tone={toRemsTone(row.status)}
+        />
+      ),
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      cell: (row) => (
+        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+          {row.expiresAt ? new Date(row.expiresAt).toLocaleDateString() : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "clinicAtt",
+      header: "Clinic attestations",
+      cell: (row) => `${row.clinicAttestedCount}/${row.clinicAttestableCount}`,
+    },
+    {
+      id: "providerAtt",
+      header: "Provider attestations",
+      cell: (row) => `${row.providerAttestedCount}/${row.providerAttestableCount}`,
+    },
+    {
+      id: "overall",
+      header: "Overall",
+      cell: (row) => {
+        const denom = row.clinicAttestableCount + row.providerAttestableCount;
+        const numer = row.clinicAttestedCount + row.providerAttestedCount;
+        const pct = denom > 0 ? Math.round((numer / denom) * 100) : 0;
+        return (
+          <StatusBadge
+            label={`${pct}%`}
+            tone={pct === 100 ? "success" : pct >= 60 ? "warning" : "neutral"}
+          />
+        );
+      },
+    },
+  ];
+
+  const providerColumns: Array<EntityTableColumn<(typeof dashboard.providerSnapshot)[number]>> = [
+    {
+      id: "provider",
+      header: "Provider",
+      cell: (row) => (
+        <Link className="font-medium hover:underline" href={`/rems/providers/${row.providerId}`}>
+          {row.providerName}
+        </Link>
+      ),
+    },
+    {
+      id: "clinic",
+      header: "Clinic",
+      cell: (row) => <span className="text-sm text-zinc-600 dark:text-zinc-400">{row.clinicName}</span>,
+    },
+    {
+      id: "status",
+      header: "Enrollment",
+      cell: (row) => (
+        <StatusBadge
+          label={row.enrollmentStatus ?? "NOT_ENROLLED"}
+          tone={toRemsTone(row.enrollmentStatus)}
+        />
+      ),
+    },
+    {
+      id: "attestations",
+      header: "Attestations",
+      cell: (row) => `${row.attested}/${row.attestable}`,
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">REMS</h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Compliance readiness and attestations (MVP engine).
-          </p>
-        </div>
-        <Badge variant="secondary">{dashboard.program.name}</Badge>
-      </div>
+      <WorkspaceHeader
+        title="REMS"
+        description="Compliance readiness, enrollment status, attestations, and expiration risk across the network."
+        scopeLabel="Compliance workspace"
+        meta={`Program: ${dashboard.program.name}`}
+        actions={<StatusBadge label={dashboard.program.name} tone="info" />}
+      />
+
+      <FilterBar
+        left={
+          <>
+            <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
+              Rolling window
+            </Badge>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Upcoming expiration horizon: 30 days</span>
+          </>
+        }
+        right={
+          <>
+            <StatusBadge
+              label={`${filteredClinics.length}/${dashboard.clinics.length} clinics in scope`}
+              tone="neutral"
+            />
+            <StatusBadge label={`Network readiness ${networkReadinessPct}%`} tone="info" />
+          </>
+        }
+      />
+
+      <RemsDashboardFilters
+        query={query}
+        enrollment={enrollment}
+        readiness={readiness}
+        expiration={expiration}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Clinics" value={dashboard.clinics.length} />
-        <MetricCard title="Requirements" value={dashboard.summary.totalRequirements} />
-        <MetricCard title="Upcoming expirations (30d)" value={dashboard.summary.upcomingExpirations30d} />
-        <MetricCard title="Expired enrollments" value={dashboard.summary.expiredEnrollments} />
+        <MetricCard label="Clinics" value={filteredClinics.length} />
+        <MetricCard label="Requirements" value={dashboard.summary.totalRequirements} />
+        <MetricCard
+          label="Upcoming expirations (30d)"
+          value={filteredUpcomingExpirations.length}
+          trendLabel={filteredUpcomingExpirations.length > 0 ? "Monitor closely" : "No upcoming risk"}
+          trendTone={filteredUpcomingExpirations.length > 0 ? "warning" : "success"}
+        />
+        <MetricCard
+          label="Expired enrollments"
+          value={
+            filteredClinics.filter((clinic) => normalizedEnrollment(clinic.status) === "EXPIRED").length +
+            filteredProviders.filter((provider) => normalizedEnrollment(provider.enrollmentStatus) === "EXPIRED")
+              .length
+          }
+          trendLabel={
+            filteredClinics.some((clinic) => normalizedEnrollment(clinic.status) === "EXPIRED") ||
+            filteredProviders.some((provider) => normalizedEnrollment(provider.enrollmentStatus) === "EXPIRED")
+              ? "Action needed"
+              : "In good standing"
+          }
+          trendTone={
+            filteredClinics.some((clinic) => normalizedEnrollment(clinic.status) === "EXPIRED") ||
+            filteredProviders.some((provider) => normalizedEnrollment(provider.enrollmentStatus) === "EXPIRED")
+              ? "danger"
+              : "success"
+          }
+        />
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Clinic readiness</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Clinic</TableHead>
-                <TableHead>Enrollment</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead>Clinic attestations</TableHead>
-                <TableHead>Provider attestations</TableHead>
-                <TableHead>Overall</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dashboard.clinics.map((c) => {
-                const denom = c.clinicAttestableCount + c.providerAttestableCount;
-                const numer = c.clinicAttestedCount + c.providerAttestedCount;
-                const pct = denom > 0 ? Math.round((numer / denom) * 100) : 0;
-                return (
-                  <TableRow key={c.clinicId}>
-                    <TableCell className="font-medium">
-                      <Link className="hover:underline" href={`/rems/clinics/${c.clinicId}`}>
-                        {c.clinicName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={c.status} />
-                    </TableCell>
-                    <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {c.clinicAttestedCount}/{c.clinicAttestableCount}
-                    </TableCell>
-                    <TableCell>
-                      {c.providerAttestedCount}/{c.providerAttestableCount}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={pct === 100 ? "success" : pct >= 60 ? "warning" : "secondary"}>
-                        {pct}%
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {dashboard.clinics.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-zinc-500">
-                    No clinics available.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <EntityPanel title="Clinic readiness" subtitle="Enrollment state, expiration timing, and attestation completion by clinic.">
+        <EntityTable
+          columns={clinicColumns}
+          rows={filteredClinics}
+          getRowKey={(row) => row.clinicId}
+          emptyState={
+            <EmptyState
+              title="No clinics match current filters"
+              description="Adjust enrollment, readiness, expiration, or search filters to broaden results."
+            />
+          }
+        />
+      </EntityPanel>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Upcoming expirations (30d)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {dashboard.upcomingExpirations.map((e) => (
-              <div
-                key={`${e.kind}:${e.clinicId}:${e.providerId ?? "none"}:${e.expiresAt.toISOString()}`}
-                className="flex items-start justify-between gap-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800"
-              >
-                <div>
-                  <div className="text-sm font-medium">
-                    {e.kind === "CLINIC" ? "Clinic enrollment" : "Provider enrollment"}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    {e.clinicName}
-                    {e.providerName ? ` · ${e.providerName}` : ""}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">{e.expiresAt.toLocaleDateString()}</div>
-                  <div className="mt-1">
-                    <Badge variant="outline">{e.status}</Badge>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {dashboard.upcomingExpirations.length === 0 ? (
-              <p className="py-6 text-center text-sm text-zinc-500">
-                No upcoming expirations in the next 30 days.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <EntityPanel title="Upcoming expirations (30d)" subtitle="Most urgent enrollment renewals requiring proactive follow-up.">
+          <Timeline
+            items={filteredUpcomingExpirations.map((exp) => ({
+              id: `${exp.kind}:${exp.clinicId}:${exp.providerId ?? "none"}:${exp.expiresAt.toISOString()}`,
+              title: exp.kind === "CLINIC" ? "Clinic enrollment expiration" : "Provider enrollment expiration",
+              description: (
+                <span>
+                  {exp.clinicName}
+                  {exp.providerName ? ` · ${exp.providerName}` : ""}
+                </span>
+              ),
+              meta: (
+                <span className="inline-flex items-center gap-2">
+                  {exp.expiresAt.toLocaleDateString()}
+                  <StatusBadge label={exp.status} tone={toRemsTone(exp.status)} />
+                </span>
+              ),
+            }))}
+            emptyState={
+              <EmptyState
+                title="No upcoming expirations in filtered view"
+                description="No clinic or provider enrollments match the current filter scope."
+              />
+            }
+          />
+        </EntityPanel>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Provider compliance snapshot</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Clinic</TableHead>
-                  <TableHead>Enrollment</TableHead>
-                  <TableHead>Attestations</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dashboard.providerSnapshot.map((p) => (
-                  <TableRow key={p.providerId}>
-                    <TableCell className="font-medium">
-                      <Link className="hover:underline" href={`/rems/providers/${p.providerId}`}>
-                        {p.providerName}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {p.clinicName}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={p.enrollmentStatus} />
-                    </TableCell>
-                    <TableCell>
-                      {p.attested}/{p.attestable}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {dashboard.providerSnapshot.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-10 text-center text-zinc-500">
-                      No providers available.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <EntityPanel title="Provider compliance snapshot" subtitle="Quick view of provider enrollment and attestation completion.">
+          <EntityTable
+            columns={providerColumns}
+            rows={filteredProviders}
+            getRowKey={(row) => row.providerId}
+            emptyState={
+              <EmptyState
+                title="No providers match current filters"
+                description="Try widening clinic, enrollment, expiration, or text search filters."
+              />
+            }
+          />
+        </EntityPanel>
       </div>
     </div>
   );
