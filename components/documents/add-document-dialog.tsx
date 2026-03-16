@@ -16,14 +16,30 @@ const schema = z.object({
   scope: z.enum(["CLINIC", "ORGANIZATION"]),
   clinicId: z.string().optional(),
   organizationId: z.string().optional(),
-  category: z.enum(["CONTRACT", "ONBOARDING", "TRAINING", "COMPLIANCE", "SUPPORT", "GENERAL"]),
+  category: z.enum([
+    "CONTRACT",
+    "ONBOARDING",
+    "TRAINING",
+    "COMPLIANCE",
+    "SUPPORT",
+    "GENERAL",
+    "ERA_REMITTANCE",
+  ]),
   title: z.string().min(2),
-  mimeType: z.string().min(3),
-  fileSize: z.number().int().nonnegative(),
-  fileName: z.string().min(1),
 });
 
 type Values = z.infer<typeof schema>;
+
+async function computeSha256Hex(file: File) {
+  try {
+    if (!("crypto" in globalThis) || !globalThis.crypto?.subtle) return undefined;
+    const buffer = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest("SHA-256", buffer);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return undefined;
+  }
+}
 
 export function AddDocumentDialog(props: {
   clinics: Array<{ id: string; name: string }>;
@@ -33,18 +49,16 @@ export function AddDocumentDialog(props: {
   const [open, setOpen] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [file, setFile] = React.useState<File | null>(null);
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
-      scope: "CLINIC",
+      scope: props.clinics.length > 0 ? "CLINIC" : "ORGANIZATION",
       clinicId: props.clinics[0]?.id ?? undefined,
       organizationId: props.defaultOrganizationId ?? undefined,
       category: "GENERAL",
       title: "",
-      mimeType: "application/pdf",
-      fileSize: 0,
-      fileName: "",
     },
   });
 
@@ -52,38 +66,93 @@ export function AddDocumentDialog(props: {
     setSubmitting(true);
     setError(null);
     try {
-      const storageKey = `uploads/${values.scope.toLowerCase()}/${Date.now()}-${values.fileName.replace(/\s+/g, "-")}`;
-      const payload =
+      if (!file) {
+        setError("Please select a file to upload.");
+        return;
+      }
+
+      const checksumSha256 = await computeSha256Hex(file);
+      const requestPayload =
         values.scope === "CLINIC"
           ? {
               clinicId: values.clinicId,
+              organizationId: values.organizationId,
+              filename: file.name,
+              mimeType: file.type || "application/octet-stream",
+              size: file.size,
+              checksumSha256,
               category: values.category,
               title: values.title,
-              storageKey,
-              mimeType: values.mimeType,
-              fileSize: values.fileSize,
             }
           : {
               organizationId: values.organizationId,
+              filename: file.name,
+              mimeType: file.type || "application/octet-stream",
+              size: file.size,
+              checksumSha256,
               category: values.category,
               title: values.title,
-              storageKey,
-              mimeType: values.mimeType,
-              fileSize: values.fileSize,
             };
 
-      const res = await fetch("/api/documents", {
+      const uploadUrlRes = await fetch("/api/documents/upload-url", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestPayload),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json?.error?.message ?? "Failed to create document metadata.");
+      const uploadUrlJson = await uploadUrlRes.json();
+      if (!uploadUrlRes.ok) {
+        setError(uploadUrlJson?.error?.message ?? "Failed to request upload URL.");
         return;
       }
+
+      const uploadRes = await fetch(uploadUrlJson.data.uploadUrl, {
+        method: "PUT",
+        headers: uploadUrlJson.data.requiredHeaders ?? {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        setError("Direct upload to storage failed.");
+        return;
+      }
+
+      const finalizePayload =
+        values.scope === "CLINIC"
+          ? {
+              clinicId: values.clinicId,
+              organizationId: values.organizationId,
+              storageKey: uploadUrlJson.data.storageKey,
+              mimeType: file.type || "application/octet-stream",
+              fileSize: file.size,
+              checksumSha256: requestPayload.checksumSha256,
+              category: values.category,
+              title: values.title,
+            }
+          : {
+              organizationId: values.organizationId,
+              storageKey: uploadUrlJson.data.storageKey,
+              mimeType: file.type || "application/octet-stream",
+              fileSize: file.size,
+              checksumSha256: requestPayload.checksumSha256,
+              category: values.category,
+              title: values.title,
+            };
+
+      const finalizeRes = await fetch("/api/documents/finalize", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(finalizePayload),
+      });
+      const finalizeJson = await finalizeRes.json();
+      if (!finalizeRes.ok) {
+        setError(finalizeJson?.error?.message ?? "Failed to finalize upload.");
+        return;
+      }
+
       setOpen(false);
-      form.reset({ ...form.getValues(), title: "", fileName: "", fileSize: 0 });
+      form.reset({ ...form.getValues(), title: "" });
+      setFile(null);
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -168,12 +237,9 @@ export function AddDocumentDialog(props: {
                   <SelectItem value="TRAINING">Training</SelectItem>
                   <SelectItem value="COMPLIANCE">Compliance</SelectItem>
                   <SelectItem value="SUPPORT">Support</SelectItem>
+                  <SelectItem value="ERA_REMITTANCE">ERA Remittance</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mimeType">MIME type</Label>
-              <Input id="mimeType" {...form.register("mimeType")} />
             </div>
           </div>
 
@@ -182,19 +248,21 @@ export function AddDocumentDialog(props: {
             <Input id="title" {...form.register("title")} />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="fileName">File name</Label>
-              <Input id="fileName" placeholder="document.pdf" {...form.register("fileName")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fileSize">File size (bytes)</Label>
-              <Input
-                id="fileSize"
-                type="number"
-                {...form.register("fileSize", { valueAsNumber: true })}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="file">File</Label>
+            <Input
+              id="file"
+              type="file"
+              onChange={(e) => {
+                const nextFile = e.target.files?.[0] ?? null;
+                setFile(nextFile);
+              }}
+            />
+            {file ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {file.name} ({file.size.toLocaleString()} bytes)
+              </p>
+            ) : null}
           </div>
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}

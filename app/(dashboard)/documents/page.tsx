@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddDocumentDialog } from "@/components/documents/add-document-dialog";
+import { DownloadDocumentButton } from "@/components/documents/download-button";
 import { getAccessSnapshot } from "@/server/services/auth/auth.service";
 import { documentFilterSchema, listDocuments } from "@/server/services/documents/document.service";
 
@@ -37,7 +38,7 @@ export default async function DocumentsPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Document metadata foundation (storage integration is a future module).
+            Secure document storage and tenant-aware access.
           </p>
         </div>
         <AddDocumentDialog clinics={clinics} defaultOrganizationId={access.defaultOrganizationId} />
@@ -73,6 +74,7 @@ export default async function DocumentsPage({
               <option value="COMPLIANCE">Compliance</option>
               <option value="SUPPORT">Support</option>
               <option value="GENERAL">General</option>
+              <option value="ERA_REMITTANCE">ERA Remittance</option>
             </select>
             <div className="md:col-span-2 flex justify-end">
               <button className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900">
@@ -90,6 +92,7 @@ export default async function DocumentsPage({
                 <TableHead>Type</TableHead>
                 <TableHead>Size</TableHead>
                 <TableHead>Uploaded</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -112,11 +115,14 @@ export default async function DocumentsPage({
                   <TableCell className="text-sm text-zinc-600 dark:text-zinc-400">
                     {new Date(d.createdAt).toLocaleDateString()}
                   </TableCell>
+                  <TableCell>
+                    <DownloadDocumentButton documentId={d.id} />
+                  </TableCell>
                 </TableRow>
               ))}
               {documents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-zinc-500">
+                  <TableCell colSpan={7} className="py-10 text-center text-zinc-500">
                     No documents found.
                   </TableCell>
                 </TableRow>

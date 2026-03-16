@@ -563,6 +563,504 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const paCaseNorthside = await prisma.priorAuthorizationCase.upsert({
+    where: { id: "seed-pa-case-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      payerName: "BlueCross BlueShield",
+      medicationName: "Esketamine",
+      patientReferenceId: "PA-EXT-1001",
+      status: "PENDING_PAYER",
+      createdByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-pa-case-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      payerName: "BlueCross BlueShield",
+      medicationName: "Esketamine",
+      patientReferenceId: "PA-EXT-1001",
+      status: "PENDING_PAYER",
+      createdByUserId: implUser.id,
+    },
+  });
+
+  await prisma.priorAuthorizationCase.upsert({
+    where: { id: "seed-pa-case-2" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPsych.id,
+      payerName: "UnitedHealthcare",
+      medicationName: "Esketamine",
+      patientReferenceId: "PA-EXT-1002",
+      status: "APPROVED",
+      createdByUserId: supportUser.id,
+    },
+    create: {
+      id: "seed-pa-case-2",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPsych.id,
+      payerName: "UnitedHealthcare",
+      medicationName: "Esketamine",
+      patientReferenceId: "PA-EXT-1002",
+      status: "APPROVED",
+      createdByUserId: supportUser.id,
+    },
+  });
+
+  await prisma.priorAuthorizationStatusEvent.upsert({
+    where: { id: "seed-pa-status-1" },
+    update: {
+      fromStatus: null,
+      toStatus: "DRAFT",
+      note: "Case created",
+      changedByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-pa-status-1",
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: null,
+      toStatus: "DRAFT",
+      note: "Case created",
+      changedByUserId: implUser.id,
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4),
+    },
+  });
+
+  await prisma.priorAuthorizationStatusEvent.upsert({
+    where: { id: "seed-pa-status-2" },
+    update: {
+      fromStatus: "DRAFT",
+      toStatus: "SUBMITTED",
+      note: "Submitted to payer",
+      changedByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-pa-status-2",
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: "DRAFT",
+      toStatus: "SUBMITTED",
+      note: "Submitted to payer",
+      changedByUserId: implUser.id,
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+    },
+  });
+
+  await prisma.priorAuthorizationStatusEvent.upsert({
+    where: { id: "seed-pa-status-3" },
+    update: {
+      fromStatus: "SUBMITTED",
+      toStatus: "PENDING_PAYER",
+      note: "Awaiting payer review",
+      changedByUserId: supportUser.id,
+    },
+    create: {
+      id: "seed-pa-status-3",
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: "SUBMITTED",
+      toStatus: "PENDING_PAYER",
+      note: "Awaiting payer review",
+      changedByUserId: supportUser.id,
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+    },
+  });
+
+  const seedOnboardingDoc = await prisma.document.findFirst({
+    where: { clinicId: clinicPrimaryCare.id, category: "ONBOARDING" },
+    select: { id: true },
+  });
+  if (seedOnboardingDoc) {
+    await prisma.fileAttachment.upsert({
+      where: { id: "seed-pa-attachment-1" },
+      update: {
+        organizationId: kaleveaOrg.id,
+        clinicId: clinicPrimaryCare.id,
+        parentType: "PRIOR_AUTH_CASE",
+        parentId: paCaseNorthside.id,
+        documentId: seedOnboardingDoc.id,
+        createdById: implUser.id,
+      },
+      create: {
+        id: "seed-pa-attachment-1",
+        organizationId: kaleveaOrg.id,
+        clinicId: clinicPrimaryCare.id,
+        parentType: "PRIOR_AUTH_CASE",
+        parentId: paCaseNorthside.id,
+        documentId: seedOnboardingDoc.id,
+        createdById: implUser.id,
+      },
+    });
+  }
+
+  const esketamineMedication = await prisma.medicationCatalogItem.upsert({
+    where: { id: "seed-med-catalog-esketamine-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      name: "Esketamine 84mg Nasal Therapy Pack",
+      brandName: "Spravato",
+      genericName: "Esketamine",
+      ndc: "50458-028-03",
+      hcpcsCode: "J3490",
+      isActive: true,
+    },
+    create: {
+      id: "seed-med-catalog-esketamine-1",
+      organizationId: kaleveaOrg.id,
+      name: "Esketamine 84mg Nasal Therapy Pack",
+      brandName: "Spravato",
+      genericName: "Esketamine",
+      ndc: "50458-028-03",
+      hcpcsCode: "J3490",
+      isActive: true,
+    },
+  });
+
+  const northsideLot = await prisma.medicationLot.upsert({
+    where: { id: "seed-med-lot-northside-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      medicationCatalogItemId: esketamineMedication.id,
+      lotNumber: "LOT-NORTH-0001",
+      expirationDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+      quantityReceived: 24,
+      quantityRemaining: 21,
+      acquisitionDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12),
+      supplierName: "Therapy Supply Partners",
+      invoiceReference: "INV-NS-22041",
+    },
+    create: {
+      id: "seed-med-lot-northside-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      medicationCatalogItemId: esketamineMedication.id,
+      lotNumber: "LOT-NORTH-0001",
+      expirationDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+      quantityReceived: 24,
+      quantityRemaining: 21,
+      acquisitionDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12),
+      supplierName: "Therapy Supply Partners",
+      invoiceReference: "INV-NS-22041",
+    },
+  });
+
+  const buyAndBillCaseNorthside = await prisma.buyAndBillCase.upsert({
+    where: { id: "seed-bnb-case-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      patientReferenceId: "BNB-EXT-2001",
+      medicationCatalogItemId: esketamineMedication.id,
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      status: "ADMINISTERED",
+      expectedReimbursementAmount: "1450.00",
+      expectedPayerName: "BlueCross BlueShield",
+      createdByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-bnb-case-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      patientReferenceId: "BNB-EXT-2001",
+      medicationCatalogItemId: esketamineMedication.id,
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      status: "ADMINISTERED",
+      expectedReimbursementAmount: "1450.00",
+      expectedPayerName: "BlueCross BlueShield",
+      createdByUserId: implUser.id,
+    },
+  });
+
+  await prisma.buyAndBillStatusEvent.upsert({
+    where: { id: "seed-bnb-status-1" },
+    update: {
+      toStatus: "DRAFT",
+      note: "Case created",
+      changedByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-bnb-status-1",
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: null,
+      toStatus: "DRAFT",
+      changedByUserId: implUser.id,
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6),
+      note: "Case created",
+    },
+  });
+
+  await prisma.buyAndBillStatusEvent.upsert({
+    where: { id: "seed-bnb-status-2" },
+    update: {
+      fromStatus: "DRAFT",
+      toStatus: "READY_FOR_ADMINISTRATION",
+      note: "Ready after intake checks",
+      changedByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-bnb-status-2",
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: "DRAFT",
+      toStatus: "READY_FOR_ADMINISTRATION",
+      changedByUserId: implUser.id,
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
+      note: "Ready after intake checks",
+    },
+  });
+
+  await prisma.buyAndBillStatusEvent.upsert({
+    where: { id: "seed-bnb-status-3" },
+    update: {
+      fromStatus: "READY_FOR_ADMINISTRATION",
+      toStatus: "ADMINISTERED",
+      note: "Dose administration complete",
+      changedByUserId: northsideAdminUser.id,
+    },
+    create: {
+      id: "seed-bnb-status-3",
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: "READY_FOR_ADMINISTRATION",
+      toStatus: "ADMINISTERED",
+      changedByUserId: northsideAdminUser.id,
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4),
+      note: "Dose administration complete",
+    },
+  });
+
+  await prisma.medicationAdministrationEvent.upsert({
+    where: { id: "seed-bnb-admin-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      medicationLotId: northsideLot.id,
+      administeredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4),
+      administeredByUserId: northsideAdminUser.id,
+      unitsAdministered: 3,
+      notes: "Seed administration for buy-and-bill timeline.",
+    },
+    create: {
+      id: "seed-bnb-admin-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      medicationLotId: northsideLot.id,
+      administeredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4),
+      administeredByUserId: northsideAdminUser.id,
+      unitsAdministered: 3,
+      notes: "Seed administration for buy-and-bill timeline.",
+    },
+  });
+
+  if (seedOnboardingDoc) {
+    await prisma.fileAttachment.upsert({
+      where: { id: "seed-bnb-attachment-case-1" },
+      update: {
+        organizationId: kaleveaOrg.id,
+        clinicId: clinicPrimaryCare.id,
+        parentType: "BUY_AND_BILL_CASE",
+        parentId: buyAndBillCaseNorthside.id,
+        documentId: seedOnboardingDoc.id,
+        createdById: implUser.id,
+      },
+      create: {
+        id: "seed-bnb-attachment-case-1",
+        organizationId: kaleveaOrg.id,
+        clinicId: clinicPrimaryCare.id,
+        parentType: "BUY_AND_BILL_CASE",
+        parentId: buyAndBillCaseNorthside.id,
+        documentId: seedOnboardingDoc.id,
+        createdById: implUser.id,
+      },
+    });
+  }
+
+  const reimbursementCaseNorthside = await prisma.reimbursementCase.upsert({
+    where: { id: "seed-reimbursement-case-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      patientReferenceId: "RMB-EXT-3001",
+      payerName: "BlueCross BlueShield",
+      expectedAmount: "1450.00",
+      expectedAllowedAmount: "1325.00",
+      status: "PARTIALLY_PAID",
+      createdByUserId: implUser.id,
+    },
+    create: {
+      id: "seed-reimbursement-case-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      buyAndBillCaseId: buyAndBillCaseNorthside.id,
+      priorAuthorizationCaseId: paCaseNorthside.id,
+      patientReferenceId: "RMB-EXT-3001",
+      payerName: "BlueCross BlueShield",
+      expectedAmount: "1450.00",
+      expectedAllowedAmount: "1325.00",
+      status: "PARTIALLY_PAID",
+      createdByUserId: implUser.id,
+    },
+  });
+
+  const reimbursementClaimNorthside = await prisma.claimRecord.upsert({
+    where: { id: "seed-reimbursement-claim-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      externalClaimId: "EXT-CLM-3001",
+      claimNumber: "CLM-3001",
+      payerName: "BlueCross BlueShield",
+      submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+      status: "PENDING",
+      billedAmount: "1450.00",
+      statusChangedByUserId: supportUser.id,
+      notes: "Seed claim record for reimbursement visibility demo.",
+    },
+    create: {
+      id: "seed-reimbursement-claim-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      externalClaimId: "EXT-CLM-3001",
+      claimNumber: "CLM-3001",
+      payerName: "BlueCross BlueShield",
+      submittedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+      status: "PENDING",
+      billedAmount: "1450.00",
+      statusChangedByUserId: supportUser.id,
+      notes: "Seed claim record for reimbursement visibility demo.",
+    },
+  });
+
+  await prisma.paymentRecord.upsert({
+    where: { id: "seed-reimbursement-payment-1" },
+    update: {
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      claimRecordId: reimbursementClaimNorthside.id,
+      paidAmount: "1000.00",
+      paidDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
+      sourceType: "MANUAL",
+      referenceNumber: "PMT-3001",
+      notes: "Seed partial payment for variance starter surface.",
+    },
+    create: {
+      id: "seed-reimbursement-payment-1",
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      claimRecordId: reimbursementClaimNorthside.id,
+      paidAmount: "1000.00",
+      paidDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
+      sourceType: "MANUAL",
+      referenceNumber: "PMT-3001",
+      notes: "Seed partial payment for variance starter surface.",
+    },
+  });
+
+  await prisma.reimbursementStatusEvent.upsert({
+    where: { id: "seed-reimbursement-status-1" },
+    update: {
+      fromStatus: null,
+      toStatus: "EXPECTED",
+      changedByUserId: implUser.id,
+      note: "Reimbursement case created",
+    },
+    create: {
+      id: "seed-reimbursement-status-1",
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: null,
+      toStatus: "EXPECTED",
+      changedByUserId: implUser.id,
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
+      note: "Reimbursement case created",
+    },
+  });
+
+  await prisma.reimbursementStatusEvent.upsert({
+    where: { id: "seed-reimbursement-status-2" },
+    update: {
+      fromStatus: "EXPECTED",
+      toStatus: "SUBMITTED",
+      changedByUserId: supportUser.id,
+      note: "Claim submitted",
+    },
+    create: {
+      id: "seed-reimbursement-status-2",
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: "EXPECTED",
+      toStatus: "SUBMITTED",
+      changedByUserId: supportUser.id,
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+      note: "Claim submitted",
+    },
+  });
+
+  await prisma.reimbursementStatusEvent.upsert({
+    where: { id: "seed-reimbursement-status-3" },
+    update: {
+      fromStatus: "SUBMITTED",
+      toStatus: "PARTIALLY_PAID",
+      changedByUserId: supportUser.id,
+      note: "Partial payment posted",
+    },
+    create: {
+      id: "seed-reimbursement-status-3",
+      reimbursementCaseId: reimbursementCaseNorthside.id,
+      organizationId: kaleveaOrg.id,
+      clinicId: clinicPrimaryCare.id,
+      fromStatus: "SUBMITTED",
+      toStatus: "PARTIALLY_PAID",
+      changedByUserId: supportUser.id,
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
+      note: "Partial payment posted",
+    },
+  });
+
+  if (seedOnboardingDoc) {
+    await prisma.fileAttachment.upsert({
+      where: { id: "seed-reimbursement-attachment-case-1" },
+      update: {
+        organizationId: kaleveaOrg.id,
+        clinicId: clinicPrimaryCare.id,
+        parentType: "REIMBURSEMENT_CASE",
+        parentId: reimbursementCaseNorthside.id,
+        documentId: seedOnboardingDoc.id,
+        createdById: implUser.id,
+      },
+      create: {
+        id: "seed-reimbursement-attachment-case-1",
+        organizationId: kaleveaOrg.id,
+        clinicId: clinicPrimaryCare.id,
+        parentType: "REIMBURSEMENT_CASE",
+        parentId: reimbursementCaseNorthside.id,
+        documentId: seedOnboardingDoc.id,
+        createdById: implUser.id,
+      },
+    });
+  }
+
   // REMS MVP seed (engine module 1)
   const remsProgram = await prisma.remsProgram.upsert({
     where: { key: "esketamine" },

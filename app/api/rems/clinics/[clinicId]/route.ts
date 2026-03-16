@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { auth } from "@/lib/auth/server";
-import { AppError } from "@/lib/utils";
+import { requireAuthenticatedUserId } from "@/lib/auth/current-user";
 import { withRouteErrorHandling } from "@/lib/utils/route";
 import { upsertEnrollmentSchema } from "@/server/services/rems/rems.schemas";
 import { getClinicRemsOverview, upsertClinicEnrollment } from "@/server/services/rems/rems.service";
@@ -11,9 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ clinicId: string }> },
 ) {
   return withRouteErrorHandling(async () => {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new AppError("Authentication required", "UNAUTHENTICATED", 401);
+    const userId = await requireAuthenticatedUserId();
 
     const { clinicId } = await params;
     const url = new URL(req.url);
@@ -28,9 +25,7 @@ export async function PATCH(
   { params }: { params: Promise<{ clinicId: string }> },
 ) {
   return withRouteErrorHandling(async () => {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new AppError("Authentication required", "UNAUTHENTICATED", 401);
+    const userId = await requireAuthenticatedUserId();
 
     const { clinicId } = await params;
     const json = await req.json();

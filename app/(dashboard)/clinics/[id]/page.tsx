@@ -49,6 +49,12 @@ export default async function ClinicWorkspacePage({
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
+            href={`/kal?intent=onboarding&clinicId=${encodeURIComponent(clinic.id)}&organizationId=${encodeURIComponent(clinic.organizationId)}&screen=clinic-workspace&query=${encodeURIComponent(`Explain onboarding and operational readiness for clinic ${clinic.name}.`)}`}
+            className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+          >
+            Explain clinic with Kal
+          </Link>
+          <Link
             href="/onboarding"
             className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
           >

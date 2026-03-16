@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
@@ -58,6 +59,18 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Identity administration</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p>Manage members and invites from the Phase 2A.1 identity admin stub.</p>
+          <Link href="/settings/identity" className="mt-3 inline-block text-sm font-medium text-zinc-900 underline dark:text-zinc-100">
+            Open identity admin
+          </Link>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

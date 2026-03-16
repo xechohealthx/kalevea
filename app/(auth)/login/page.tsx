@@ -7,12 +7,17 @@ import { LoginForm } from "./ui";
 export default async function LoginPage() {
   const session = await auth();
   if (session?.user?.id) redirect("/dashboard");
+  const isDevelopment = process.env.NODE_ENV === "development";
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Kalevea</CardTitle>
-        <CardDescription>Sign in to the Kalevea Core platform (dev auth).</CardDescription>
+        <CardDescription>
+          {isDevelopment
+            ? "Sign in to the Kalevea Core platform (development auth enabled)."
+            : "Sign in to the Kalevea Core platform."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm />

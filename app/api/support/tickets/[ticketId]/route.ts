@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { auth } from "@/lib/auth/server";
-import { AppError } from "@/lib/utils";
+import { requireAuthenticatedUserId } from "@/lib/auth/current-user";
 import { withRouteErrorHandling } from "@/lib/utils/route";
 import { getTicket } from "@/server/services/support/support.service";
 
@@ -10,9 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ ticketId: string }> },
 ) {
   return withRouteErrorHandling(async () => {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) throw new AppError("Authentication required", "UNAUTHENTICATED", 401);
+    const userId = await requireAuthenticatedUserId();
 
     const { ticketId } = await params;
     return getTicket({ actorUserId: userId }, ticketId);

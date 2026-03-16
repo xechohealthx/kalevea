@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -109,6 +109,7 @@ enum DocumentCategory {
   COMPLIANCE
   SUPPORT
   GENERAL
+  ERA_REMITTANCE
 }
 
 enum WorkTaskStatus {
@@ -145,6 +146,134 @@ enum RemsRequirementType {
   OTHER
 }
 
+enum AuthProviderType {
+  DEVELOPMENT_CREDENTIALS
+  EMAIL
+  GOOGLE
+  OIDC
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum PriorAuthorizationCaseStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_PAYER
+  APPROVED
+  DENIED
+  CANCELLED
+}
+
+enum BuyAndBillCaseStatus {
+  DRAFT
+  READY_FOR_ADMINISTRATION
+  ADMINISTERED
+  BILLING_PENDING
+  SUBMITTED
+  PAID
+  DENIED
+  CANCELLED
+}
+
+enum ReimbursementCaseStatus {
+  EXPECTED
+  CLAIM_DRAFT
+  SUBMITTED
+  PENDING_PAYMENT
+  PARTIALLY_PAID
+  PAID
+  DENIED
+  APPEAL_NEEDED
+  CLOSED
+}
+
+enum ClaimRecordStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  PENDING
+  PAID
+  DENIED
+}
+
+enum PaymentSourceType {
+  MANUAL
+  ERA_IMPORTED
+  OTHER
+}
+
+enum ReconciliationStatus {
+  UNMATCHED
+  PARTIALLY_MATCHED
+  MATCHED
+}
+
+enum PayerRuleCategory {
+  AUTHORIZATION
+  REIMBURSEMENT
+  DOCUMENTATION
+  OPERATIONAL
+}
+
+enum PayerRuleConfidenceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PayerRuleSourceType {
+  MANUAL
+  AI_SUGGESTED
+  POLICY_DOCUMENT
+  CONTRACT
+}
+
+enum PayerRuleSuggestionStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum AutomationRuleType {
+  UNDERPAYMENT_ALERT
+  PA_STUCK_ALERT
+  PAYMENT_DELAY_ALERT
+  DOCUMENTATION_MISSING
+}
+
+enum AutomationEventStatus {
+  SUCCESS
+  SKIPPED
+  ERROR
+}
+
+enum RevenueOptimizationSignalType {
+  APPEAL_OPPORTUNITY
+  HIGH_VARIANCE_RISK
+  PAYER_PATTERN_ALERT
+  FORECAST_RISK
+}
+
+enum RevenueOptimizationSignalSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PredictiveSignalType {
+  PAYMENT_DELAY_RISK
+  UNDERPAYMENT_RISK
+  PA_DENIAL_RISK
+  ONBOARDING_DELAY_RISK
+  REVENUE_FORECAST
+}
+
 model Organization {
   id        String           @id @default(cuid())
   name      String
@@ -158,16 +287,35 @@ model Organization {
   auditLogs AuditLog[]
   orgRoles  UserOrganizationRole[]
 
-  notes         Note[]
-  attachments   FileAttachment[]
+  notes          Note[]
+  attachments    FileAttachment[]
   activityEvents ActivityEvent[]
-  workTasks     WorkTask[]
-  statusEvents  StatusEvent[]
+  workTasks      WorkTask[]
+  statusEvents   StatusEvent[]
 
-  remsClinicEnrollments   ClinicRemsEnrollment[]
-  remsProviderEnrollments ProviderRemsEnrollment[]
-  remsRequirements        RemsRequirement[]
-  remsAttestations        RemsAttestation[]
+  remsClinicEnrollments          ClinicRemsEnrollment[]
+  remsProviderEnrollments        ProviderRemsEnrollment[]
+  remsRequirements               RemsRequirement[]
+  remsAttestations               RemsAttestation[]
+  priorAuthorizationCases        PriorAuthorizationCase[]
+  priorAuthorizationStatusEvents PriorAuthorizationStatusEvent[]
+  medicationCatalogItems         MedicationCatalogItem[]
+  medicationLots                 MedicationLot[]
+  buyAndBillCases                BuyAndBillCase[]
+  medicationAdministrationEvents MedicationAdministrationEvent[]
+  buyAndBillStatusEvents         BuyAndBillStatusEvent[]
+  reimbursementCases             ReimbursementCase[]
+  claimRecords                   ClaimRecord[]
+  paymentRecords                 PaymentRecord[]
+  reimbursementStatusEvents      ReimbursementStatusEvent[]
+  remittanceFiles                RemittanceFile[]
+  payerAnalyticsSnapshots        PayerAnalyticsSnapshot[]
+  payerRules                     PayerRule[]
+  payerRuleSuggestions           PayerRuleSuggestion[]
+  automationRules                AutomationRule[]
+  automationEvents               AutomationEvent[]
+  revenueOptimizationSignals     RevenueOptimizationSignal[]
+  predictiveSignals              PredictiveSignal[]
 
   @@unique([slug])
   @@index([type])
@@ -182,21 +330,21 @@ model Clinic {
   clinicType     ClinicType
   status         ClinicStatus @default(PROSPECT)
 
-  addressLine1   String?
-  addressLine2   String?
-  city           String?
-  state          String?
-  postalCode     String?
-  country        String?      @default("US")
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String? @default("US")
 
-  phone          String?
-  email          String?
-  timezone       String       @default("America/New_York")
+  phone    String?
+  email    String?
+  timezone String  @default("America/New_York")
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   providers      Provider[]
   staffProfiles  StaffProfile[]
   onboarding     ClinicOnboardingProject?
@@ -206,16 +354,30 @@ model Clinic {
   auditLogs      AuditLog[]
   clinicRoles    UserClinicRole[]
 
-  notes         Note[]
-  attachments   FileAttachment[]
+  notes          Note[]
+  attachments    FileAttachment[]
   activityEvents ActivityEvent[]
-  workTasks     WorkTask[]
-  statusEvents  StatusEvent[]
+  workTasks      WorkTask[]
+  statusEvents   StatusEvent[]
 
-  remsEnrollments         ClinicRemsEnrollment[]
-  remsProviderEnrollments ProviderRemsEnrollment[]
-  remsRequirements        RemsRequirement[]
-  remsAttestations        RemsAttestation[]
+  remsEnrollments                ClinicRemsEnrollment[]
+  remsProviderEnrollments        ProviderRemsEnrollment[]
+  remsRequirements               RemsRequirement[]
+  remsAttestations               RemsAttestation[]
+  priorAuthorizationCases        PriorAuthorizationCase[]
+  priorAuthorizationStatusEvents PriorAuthorizationStatusEvent[]
+  medicationLots                 MedicationLot[]
+  buyAndBillCases                BuyAndBillCase[]
+  medicationAdministrationEvents MedicationAdministrationEvent[]
+  buyAndBillStatusEvents         BuyAndBillStatusEvent[]
+  reimbursementCases             ReimbursementCase[]
+  claimRecords                   ClaimRecord[]
+  paymentRecords                 PaymentRecord[]
+  reimbursementStatusEvents      ReimbursementStatusEvent[]
+  remittanceFiles                RemittanceFile[]
+  payerRules                     PayerRule[]
+  revenueOptimizationSignals     RevenueOptimizationSignal[]
+  predictiveSignals              PredictiveSignal[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -225,13 +387,18 @@ model Clinic {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  firstName String
-  lastName  String
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                     String            @id @default(cuid())
+  email                  String            @unique
+  firstName              String
+  lastName               String
+  isActive               Boolean           @default(true)
+  authProviderType       AuthProviderType?
+  externalAuthProviderId String?
+  invitationStatus       InvitationStatus  @default(ACCEPTED)
+  invitedAt              DateTime?
+  acceptedAt             DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   credential         UserCredential?
   orgRoles           UserOrganizationRole[]
@@ -245,21 +412,38 @@ model User {
   uploadedDocuments  Document[]
   auditLogs          AuditLog[]                @relation("AuditActor")
 
-  notesCreated        Note[]            @relation("NoteCreatedBy")
-  attachmentsCreated  FileAttachment[]  @relation("FileAttachmentCreatedBy")
-  activityCreated     ActivityEvent[]   @relation("ActivityEventCreatedBy")
-  workTasksCreated    WorkTask[]        @relation("WorkTaskCreatedBy")
-  workTasksUpdated    WorkTask[]        @relation("WorkTaskUpdatedBy")
-  workTasksAssigned   WorkTask[]        @relation("WorkTaskAssignedTo")
-  statusEventsChanged StatusEvent[]     @relation("StatusEventChangedBy")
+  notesCreated        Note[]           @relation("NoteCreatedBy")
+  attachmentsCreated  FileAttachment[] @relation("FileAttachmentCreatedBy")
+  activityCreated     ActivityEvent[]  @relation("ActivityEventCreatedBy")
+  workTasksCreated    WorkTask[]       @relation("WorkTaskCreatedBy")
+  workTasksUpdated    WorkTask[]       @relation("WorkTaskUpdatedBy")
+  workTasksAssigned   WorkTask[]       @relation("WorkTaskAssignedTo")
+  statusEventsChanged StatusEvent[]    @relation("StatusEventChangedBy")
 
-  remsClinicEnrollmentsCreated   ClinicRemsEnrollment[]   @relation("RemsClinicEnrollmentCreatedBy")
-  remsClinicEnrollmentsUpdated   ClinicRemsEnrollment[]   @relation("RemsClinicEnrollmentUpdatedBy")
-  remsProviderEnrollmentsCreated ProviderRemsEnrollment[] @relation("RemsProviderEnrollmentCreatedBy")
-  remsProviderEnrollmentsUpdated ProviderRemsEnrollment[] @relation("RemsProviderEnrollmentUpdatedBy")
-  remsAttestations               RemsAttestation[]        @relation("RemsAttestedBy")
+  remsClinicEnrollmentsCreated   ClinicRemsEnrollment[]          @relation("RemsClinicEnrollmentCreatedBy")
+  remsClinicEnrollmentsUpdated   ClinicRemsEnrollment[]          @relation("RemsClinicEnrollmentUpdatedBy")
+  remsProviderEnrollmentsCreated ProviderRemsEnrollment[]        @relation("RemsProviderEnrollmentCreatedBy")
+  remsProviderEnrollmentsUpdated ProviderRemsEnrollment[]        @relation("RemsProviderEnrollmentUpdatedBy")
+  remsAttestations               RemsAttestation[]               @relation("RemsAttestedBy")
+  priorAuthorizationCasesCreated PriorAuthorizationCase[]        @relation("PriorAuthorizationCaseCreatedBy")
+  priorAuthorizationStatusEvents PriorAuthorizationStatusEvent[] @relation("PriorAuthorizationStatusChangedBy")
+  buyAndBillCasesCreated         BuyAndBillCase[]                @relation("BuyAndBillCaseCreatedBy")
+  medicationAdministrationEvents MedicationAdministrationEvent[] @relation("MedicationAdministeredBy")
+  buyAndBillStatusEvents         BuyAndBillStatusEvent[]         @relation("BuyAndBillStatusChangedBy")
+  reimbursementCasesCreated      ReimbursementCase[]             @relation("ReimbursementCaseCreatedBy")
+  reimbursementStatusEvents      ReimbursementStatusEvent[]      @relation("ReimbursementStatusChangedBy")
+  claimStatusEvents              ClaimRecord[]                   @relation("ClaimRecordStatusChangedBy")
+  remittanceFilesProcessed       RemittanceFile[]                @relation("RemittanceFileProcessedBy")
+  payerRulesCreated              PayerRule[]                     @relation("PayerRuleCreatedBy")
+  payerRuleEvidenceCreated       PayerRuleEvidence[]             @relation("PayerRuleEvidenceCreatedBy")
+  payerRuleSuggestionsCreated    PayerRuleSuggestion[]           @relation("PayerRuleSuggestionCreatedBy")
+  automationRulesCreated         AutomationRule[]                @relation("AutomationRuleCreatedBy")
+  automationEventsTriggered      AutomationEvent[]               @relation("AutomationEventTriggeredBy")
 
   @@index([isActive])
+  @@index([authProviderType])
+  @@index([invitationStatus])
+  @@index([authProviderType, externalAuthProviderId])
   @@index([createdAt])
 }
 
@@ -280,7 +464,7 @@ model Role {
   name  String
   scope RoleScope
 
-  orgGrants   UserOrganizationRole[]
+  orgGrants    UserOrganizationRole[]
   clinicGrants UserClinicRole[]
 
   @@index([scope])
@@ -332,9 +516,9 @@ model Provider {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  assignments TrainingAssignment[]
-  remsEnrollments ProviderRemsEnrollment[]
+  clinic           Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  assignments      TrainingAssignment[]
+  remsEnrollments  ProviderRemsEnrollment[]
   remsAttestations RemsAttestation[]
 
   @@index([clinicId])
@@ -356,8 +540,8 @@ model StaffProfile {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clinic      Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user        User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   assignments TrainingAssignment[]
 
   @@index([clinicId])
@@ -366,16 +550,16 @@ model StaffProfile {
 }
 
 model ClinicOnboardingProject {
-  id               String                      @id @default(cuid())
-  clinicId         String                      @unique
+  id               String                        @id @default(cuid())
+  clinicId         String                        @unique
   status           ClinicOnboardingProjectStatus @default(NOT_STARTED)
   ownerUserId      String?
   targetGoLiveDate DateTime?
-  createdAt        DateTime                    @default(now())
-  updatedAt        DateTime                    @updatedAt
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
 
-  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  owner  User?  @relation("OnboardingOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  clinic Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  owner  User?            @relation("OnboardingOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   tasks  OnboardingTask[]
 
   @@index([status])
@@ -384,17 +568,17 @@ model ClinicOnboardingProject {
 }
 
 model OnboardingTask {
-  id             String              @id @default(cuid())
+  id             String                 @id @default(cuid())
   projectId      String
   category       OnboardingTaskCategory
   title          String
   description    String?
-  status         OnboardingTaskStatus @default(TODO)
+  status         OnboardingTaskStatus   @default(TODO)
   assignedUserId String?
   dueDate        DateTime?
-  sortOrder      Int                 @default(0)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  sortOrder      Int                    @default(0)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   project  ClinicOnboardingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignee User?                   @relation("OnboardingAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
@@ -407,21 +591,21 @@ model OnboardingTask {
 }
 
 model SupportTicket {
-  id              String             @id @default(cuid())
-  clinicId        String
-  createdByUserId String?
-  category        SupportTicketCategory
-  priority        SupportTicketPriority @default(MEDIUM)
-  status          SupportTicketStatus   @default(OPEN)
-  subject         String
-  description     String
+  id               String                @id @default(cuid())
+  clinicId         String
+  createdByUserId  String?
+  category         SupportTicketCategory
+  priority         SupportTicketPriority @default(MEDIUM)
+  status           SupportTicketStatus   @default(OPEN)
+  subject          String
+  description      String
   assignedToUserId String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
-  clinic     Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  createdBy  User?  @relation("SupportTicketCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  assignedTo User?  @relation("SupportTicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  clinic     Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  createdBy  User?                  @relation("SupportTicketCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  assignedTo User?                  @relation("SupportTicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   comments   SupportTicketComment[]
 
   @@index([clinicId])
@@ -464,14 +648,14 @@ model TrainingCourse {
 }
 
 model TrainingLesson {
-  id          String                  @id @default(cuid())
+  id          String                    @id @default(cuid())
   courseId    String
   title       String
-  sortOrder   Int                     @default(0)
+  sortOrder   Int                       @default(0)
   contentType TrainingLessonContentType
   content     String
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
 
   course TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
@@ -480,18 +664,18 @@ model TrainingLesson {
 }
 
 model TrainingAssignment {
-  id             String                 @id @default(cuid())
-  clinicId        String
+  id             String                   @id @default(cuid())
+  clinicId       String
   providerId     String?
   staffProfileId String?
   courseId       String
   status         TrainingAssignmentStatus @default(NOT_STARTED)
-  assignedAt     DateTime               @default(now())
+  assignedAt     DateTime                 @default(now())
   completedAt    DateTime?
 
-  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  provider     Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  staffProfile StaffProfile? @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
+  clinic       Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  provider     Provider?      @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  staffProfile StaffProfile?  @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
   course       TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([clinicId])
@@ -502,21 +686,24 @@ model TrainingAssignment {
 }
 
 model Document {
-  id              String          @id @default(cuid())
-  organizationId  String?
-  clinicId        String?
-  category        DocumentCategory
-  title           String
-  storageKey      String
-  mimeType        String
-  fileSize        Int
+  id               String           @id @default(cuid())
+  organizationId   String?
+  clinicId         String?
+  category         DocumentCategory
+  title            String
+  storageKey       String
+  mimeType         String
+  fileSize         Int
   uploadedByUserId String?
-  createdAt       DateTime        @default(now())
+  createdAt        DateTime         @default(now())
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clinic       Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  uploadedBy   User?         @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  attachments FileAttachment[]
+  organization               Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                     Clinic?               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  uploadedBy                 User?                 @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  attachments                FileAttachment[]
+  remittanceFiles            RemittanceFile[]
+  payerRuleEvidence          PayerRuleEvidence[]
+  payerRuleSuggestionsSource PayerRuleSuggestion[] @relation("PayerRuleSuggestionSourceDocument")
 
   @@index([organizationId])
   @@index([clinicId])
@@ -593,22 +780,22 @@ model ActivityEvent {
 }
 
 model WorkTask {
-  id             String           @id @default(cuid())
+  id             String            @id @default(cuid())
   organizationId String
   clinicId       String?
   parentType     String
   parentId       String
   title          String
   description    String?
-  status         WorkTaskStatus   @default(TODO)
+  status         WorkTaskStatus    @default(TODO)
   priority       WorkTaskPriority?
   assignedToId   String?
   dueAt          DateTime?
   completedAt    DateTime?
   createdById    String
   updatedById    String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -667,25 +854,25 @@ model RemsProgram {
 }
 
 model ClinicRemsEnrollment {
-  id            String               @id @default(cuid())
+  id             String               @id @default(cuid())
   organizationId String
-  clinicId      String
-  remsProgramId String
-  status        RemsEnrollmentStatus @default(PENDING)
-  enrolledAt    DateTime?
-  expiresAt     DateTime?
+  clinicId       String
+  remsProgramId  String
+  status         RemsEnrollmentStatus @default(PENDING)
+  enrolledAt     DateTime?
+  expiresAt      DateTime?
   lastReviewedAt DateTime?
-  notes         String?
-  createdById   String?
-  updatedById   String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  notes          String?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  program      RemsProgram  @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation("RemsClinicEnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?        @relation("RemsClinicEnrollmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  program      RemsProgram       @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  createdBy    User?             @relation("RemsClinicEnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?             @relation("RemsClinicEnrollmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   attestations RemsAttestation[]
 
   @@unique([clinicId, remsProgramId])
@@ -698,27 +885,27 @@ model ClinicRemsEnrollment {
 }
 
 model ProviderRemsEnrollment {
-  id            String               @id @default(cuid())
+  id             String               @id @default(cuid())
   organizationId String
-  clinicId      String
-  providerId    String
-  remsProgramId String
-  status        RemsEnrollmentStatus @default(PENDING)
-  enrolledAt    DateTime?
-  expiresAt     DateTime?
+  clinicId       String
+  providerId     String
+  remsProgramId  String
+  status         RemsEnrollmentStatus @default(PENDING)
+  enrolledAt     DateTime?
+  expiresAt      DateTime?
   lastReviewedAt DateTime?
-  notes         String?
-  createdById   String?
-  updatedById   String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  notes          String?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  provider     Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  program      RemsProgram  @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation("RemsProviderEnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?        @relation("RemsProviderEnrollmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  provider     Provider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  program      RemsProgram       @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  createdBy    User?             @relation("RemsProviderEnrollmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?             @relation("RemsProviderEnrollmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   attestations RemsAttestation[]
 
   @@unique([providerId, remsProgramId])
@@ -732,23 +919,23 @@ model ProviderRemsEnrollment {
 }
 
 model RemsRequirement {
-  id             String             @id @default(cuid())
-  organizationId String?
-  clinicId       String?
-  remsProgramId  String
-  appliesToType  RemsAppliesToType
-  title          String
-  description    String?
+  id              String              @id @default(cuid())
+  organizationId  String?
+  clinicId        String?
+  remsProgramId   String
+  appliesToType   RemsAppliesToType
+  title           String
+  description     String?
   requirementType RemsRequirementType
-  isRequired     Boolean            @default(true)
-  sortOrder      Int                @default(0)
-  isActive       Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  isRequired      Boolean             @default(true)
+  sortOrder       Int                 @default(0)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clinic       Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  program      RemsProgram   @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  program      RemsProgram       @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
   attestations RemsAttestation[]
 
   @@index([remsProgramId])
@@ -762,27 +949,27 @@ model RemsRequirement {
 }
 
 model RemsAttestation {
-  id                      String   @id @default(cuid())
-  organizationId          String
-  clinicId                String
-  remsProgramId           String
-  remsRequirementId       String?
-  providerId              String?
-  clinicRemsEnrollmentId  String?
+  id                       String   @id @default(cuid())
+  organizationId           String
+  clinicId                 String
+  remsProgramId            String
+  remsRequirementId        String?
+  providerId               String?
+  clinicRemsEnrollmentId   String?
   providerRemsEnrollmentId String?
-  title                   String
-  attestedById            String
-  attestedAt              DateTime @default(now())
-  notes                   String?
+  title                    String
+  attestedById             String
+  attestedAt               DateTime @default(now())
+  notes                    String?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clinic       Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  program      RemsProgram  @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
-  requirement  RemsRequirement? @relation(fields: [remsRequirementId], references: [id], onDelete: SetNull)
-  provider     Provider?    @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  clinicEnrollment  ClinicRemsEnrollment?  @relation(fields: [clinicRemsEnrollmentId], references: [id], onDelete: SetNull)
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic             Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  program            RemsProgram             @relation(fields: [remsProgramId], references: [id], onDelete: Cascade)
+  requirement        RemsRequirement?        @relation(fields: [remsRequirementId], references: [id], onDelete: SetNull)
+  provider           Provider?               @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  clinicEnrollment   ClinicRemsEnrollment?   @relation(fields: [clinicRemsEnrollmentId], references: [id], onDelete: SetNull)
   providerEnrollment ProviderRemsEnrollment? @relation(fields: [providerRemsEnrollmentId], references: [id], onDelete: SetNull)
-  attestedBy   User         @relation("RemsAttestedBy", fields: [attestedById], references: [id], onDelete: Restrict)
+  attestedBy         User                    @relation("RemsAttestedBy", fields: [attestedById], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
   @@index([clinicId])
@@ -790,6 +977,560 @@ model RemsAttestation {
   @@index([remsRequirementId])
   @@index([providerId])
   @@index([attestedAt])
+}
+
+model PriorAuthorizationCase {
+  id                 String                       @id @default(cuid())
+  organizationId     String
+  clinicId           String
+  payerName          String
+  medicationName     String
+  patientReferenceId String?
+  status             PriorAuthorizationCaseStatus @default(DRAFT)
+  createdByUserId    String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic             Clinic                          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  createdBy          User?                           @relation("PriorAuthorizationCaseCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  statusEvents       PriorAuthorizationStatusEvent[]
+  buyAndBillCases    BuyAndBillCase[]
+  reimbursementCases ReimbursementCase[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([status])
+  @@index([createdByUserId])
+  @@index([createdAt])
+}
+
+model PriorAuthorizationStatusEvent {
+  id                       String                        @id @default(cuid())
+  priorAuthorizationCaseId String
+  organizationId           String
+  clinicId                 String
+  fromStatus               PriorAuthorizationCaseStatus?
+  toStatus                 PriorAuthorizationCaseStatus
+  note                     String?
+  changedByUserId          String?
+  createdAt                DateTime                      @default(now())
+
+  priorAuthorizationCase PriorAuthorizationCase @relation(fields: [priorAuthorizationCaseId], references: [id], onDelete: Cascade)
+  organization           Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                 Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  changedBy              User?                  @relation("PriorAuthorizationStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([priorAuthorizationCaseId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([toStatus])
+  @@index([createdAt])
+}
+
+model MedicationCatalogItem {
+  id             String   @id @default(cuid())
+  organizationId String?
+  name           String
+  brandName      String?
+  genericName    String?
+  ndc            String?
+  hcpcsCode      String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  medicationLots  MedicationLot[]
+  buyAndBillCases BuyAndBillCase[]
+  payerRules      PayerRule[]
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@index([ndc])
+  @@index([hcpcsCode])
+  @@index([createdAt])
+}
+
+model MedicationLot {
+  id                      String   @id @default(cuid())
+  organizationId          String
+  clinicId                String
+  medicationCatalogItemId String
+  lotNumber               String
+  expirationDate          DateTime
+  quantityReceived        Int
+  quantityRemaining       Int
+  acquisitionDate         DateTime
+  supplierName            String?
+  invoiceReference        String?
+  createdAt               DateTime @default(now())
+
+  organization          Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                Clinic                          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  medicationCatalogItem MedicationCatalogItem           @relation(fields: [medicationCatalogItemId], references: [id], onDelete: Restrict)
+  administrations       MedicationAdministrationEvent[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([medicationCatalogItemId])
+  @@index([lotNumber])
+  @@index([expirationDate])
+  @@index([createdAt])
+}
+
+model BuyAndBillCase {
+  id                          String               @id @default(cuid())
+  organizationId              String
+  clinicId                    String
+  patientReferenceId          String?
+  medicationCatalogItemId     String
+  priorAuthorizationCaseId    String?
+  status                      BuyAndBillCaseStatus @default(DRAFT)
+  expectedReimbursementAmount Decimal?             @db.Decimal(12, 2)
+  expectedPayerName           String?
+  createdByUserId             String
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+
+  organization           Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                 Clinic                          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  medicationCatalogItem  MedicationCatalogItem           @relation(fields: [medicationCatalogItemId], references: [id], onDelete: Restrict)
+  priorAuthorizationCase PriorAuthorizationCase?         @relation(fields: [priorAuthorizationCaseId], references: [id], onDelete: SetNull)
+  createdBy              User                            @relation("BuyAndBillCaseCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  administrations        MedicationAdministrationEvent[]
+  statusEvents           BuyAndBillStatusEvent[]
+  reimbursementCases     ReimbursementCase[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([status])
+  @@index([createdByUserId])
+  @@index([medicationCatalogItemId])
+  @@index([priorAuthorizationCaseId])
+  @@index([createdAt])
+}
+
+model MedicationAdministrationEvent {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  clinicId             String
+  buyAndBillCaseId     String
+  medicationLotId      String
+  administeredAt       DateTime
+  administeredByUserId String
+  unitsAdministered    Int
+  notes                String?
+  createdAt            DateTime @default(now())
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic         Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  buyAndBillCase BuyAndBillCase @relation(fields: [buyAndBillCaseId], references: [id], onDelete: Cascade)
+  medicationLot  MedicationLot  @relation(fields: [medicationLotId], references: [id], onDelete: Restrict)
+  administeredBy User           @relation("MedicationAdministeredBy", fields: [administeredByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([buyAndBillCaseId])
+  @@index([medicationLotId])
+  @@index([administeredAt])
+  @@index([createdAt])
+}
+
+model BuyAndBillStatusEvent {
+  id               String                @id @default(cuid())
+  buyAndBillCaseId String
+  organizationId   String
+  clinicId         String
+  fromStatus       BuyAndBillCaseStatus?
+  toStatus         BuyAndBillCaseStatus
+  changedByUserId  String
+  changedAt        DateTime              @default(now())
+  note             String?
+
+  buyAndBillCase BuyAndBillCase @relation(fields: [buyAndBillCaseId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic         Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  changedBy      User           @relation("BuyAndBillStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([buyAndBillCaseId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([toStatus])
+  @@index([changedAt])
+}
+
+model ReimbursementCase {
+  id                       String                  @id @default(cuid())
+  organizationId           String
+  clinicId                 String
+  buyAndBillCaseId         String?
+  priorAuthorizationCaseId String?
+  patientReferenceId       String?
+  payerName                String
+  expectedAmount           Decimal                 @db.Decimal(12, 2)
+  expectedAllowedAmount    Decimal?                @db.Decimal(12, 2)
+  underpaymentFlag         Boolean                 @default(false)
+  status                   ReimbursementCaseStatus @default(EXPECTED)
+  createdByUserId          String
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+
+  organization               Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                     Clinic                      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  buyAndBillCase             BuyAndBillCase?             @relation(fields: [buyAndBillCaseId], references: [id], onDelete: SetNull)
+  priorAuthorizationCase     PriorAuthorizationCase?     @relation(fields: [priorAuthorizationCaseId], references: [id], onDelete: SetNull)
+  createdBy                  User                        @relation("ReimbursementCaseCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  claims                     ClaimRecord[]
+  payments                   PaymentRecord[]
+  statusEvents               ReimbursementStatusEvent[]
+  remittancePaymentsMatched  RemittancePayment[]         @relation("RemittancePaymentMatchedReimbursementCase")
+  revenueOptimizationSignals RevenueOptimizationSignal[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([status])
+  @@index([underpaymentFlag])
+  @@index([payerName])
+  @@index([buyAndBillCaseId])
+  @@index([priorAuthorizationCaseId])
+  @@index([createdByUserId])
+  @@index([createdAt])
+}
+
+model ClaimRecord {
+  id                    String            @id @default(cuid())
+  organizationId        String
+  clinicId              String
+  reimbursementCaseId   String
+  externalClaimId       String?
+  claimNumber           String?
+  payerName             String
+  submittedAt           DateTime?
+  status                ClaimRecordStatus @default(DRAFT)
+  billedAmount          Decimal?          @db.Decimal(12, 2)
+  notes                 String?
+  statusChangedByUserId String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  organization              Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                    Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  reimbursementCase         ReimbursementCase   @relation(fields: [reimbursementCaseId], references: [id], onDelete: Cascade)
+  statusChangedBy           User?               @relation("ClaimRecordStatusChangedBy", fields: [statusChangedByUserId], references: [id], onDelete: SetNull)
+  payments                  PaymentRecord[]
+  remittancePaymentsMatched RemittancePayment[] @relation("RemittancePaymentMatchedClaim")
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([reimbursementCaseId])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([createdAt])
+}
+
+model PaymentRecord {
+  id                  String            @id @default(cuid())
+  organizationId      String
+  clinicId            String
+  reimbursementCaseId String
+  claimRecordId       String?
+  paidAmount          Decimal           @db.Decimal(12, 2)
+  paidDate            DateTime
+  sourceType          PaymentSourceType @default(MANUAL)
+  referenceNumber     String?
+  notes               String?
+  createdAt           DateTime          @default(now())
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic             Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  reimbursementCase  ReimbursementCase   @relation(fields: [reimbursementCaseId], references: [id], onDelete: Cascade)
+  claimRecord        ClaimRecord?        @relation(fields: [claimRecordId], references: [id], onDelete: SetNull)
+  remittancePayments RemittancePayment[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([reimbursementCaseId])
+  @@index([claimRecordId])
+  @@index([paidDate])
+  @@index([sourceType])
+}
+
+model ReimbursementStatusEvent {
+  id                  String                   @id @default(cuid())
+  reimbursementCaseId String
+  organizationId      String
+  clinicId            String
+  fromStatus          ReimbursementCaseStatus?
+  toStatus            ReimbursementCaseStatus
+  changedByUserId     String
+  changedAt           DateTime                 @default(now())
+  note                String?
+
+  reimbursementCase ReimbursementCase @relation(fields: [reimbursementCaseId], references: [id], onDelete: Cascade)
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic            Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  changedBy         User              @relation("ReimbursementStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([reimbursementCaseId])
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([toStatus])
+  @@index([changedAt])
+}
+
+model RemittanceFile {
+  id                   String               @id @default(cuid())
+  organizationId       String
+  clinicId             String
+  documentId           String               @unique
+  payerName            String?
+  paymentDate          DateTime?
+  totalAmount          Decimal?             @db.Decimal(12, 2)
+  reconciliationStatus ReconciliationStatus @default(UNMATCHED)
+  processedByUserId    String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  document     Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  processedBy  User?               @relation("RemittanceFileProcessedBy", fields: [processedByUserId], references: [id], onDelete: SetNull)
+  payments     RemittancePayment[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([paymentDate])
+  @@index([reconciliationStatus])
+  @@index([createdAt])
+}
+
+model RemittancePayment {
+  id                         String               @id @default(cuid())
+  remittanceFileId           String
+  claimReference             String?
+  payerClaimControlNumber    String?
+  paidAmount                 Decimal              @db.Decimal(12, 2)
+  adjustmentAmount           Decimal?             @db.Decimal(12, 2)
+  cacCodes                   Json?
+  renderingNpi               String?
+  billingTaxId               String?
+  reconciliationStatus       ReconciliationStatus @default(UNMATCHED)
+  matchedClaimRecordId       String?
+  matchedReimbursementCaseId String?
+  paymentRecordId            String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  remittanceFile           RemittanceFile     @relation(fields: [remittanceFileId], references: [id], onDelete: Cascade)
+  matchedClaimRecord       ClaimRecord?       @relation("RemittancePaymentMatchedClaim", fields: [matchedClaimRecordId], references: [id], onDelete: SetNull)
+  matchedReimbursementCase ReimbursementCase? @relation("RemittancePaymentMatchedReimbursementCase", fields: [matchedReimbursementCaseId], references: [id], onDelete: SetNull)
+  paymentRecord            PaymentRecord?     @relation(fields: [paymentRecordId], references: [id], onDelete: SetNull)
+
+  @@index([remittanceFileId])
+  @@index([claimReference])
+  @@index([payerClaimControlNumber])
+  @@index([reconciliationStatus])
+  @@index([matchedClaimRecordId])
+  @@index([matchedReimbursementCaseId])
+  @@index([paymentRecordId])
+  @@index([createdAt])
+}
+
+model PayerAnalyticsSnapshot {
+  id               String   @id @default(cuid())
+  organizationId   String
+  payerName        String
+  totalClaims      Int
+  totalExpected    Decimal  @db.Decimal(12, 2)
+  totalPaid        Decimal  @db.Decimal(12, 2)
+  totalVariance    Decimal  @db.Decimal(12, 2)
+  underpaymentRate Decimal  @db.Decimal(5, 2)
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([payerName])
+  @@index([createdAt])
+}
+
+model PayerRule {
+  id                          String                   @id @default(cuid())
+  organizationId              String?
+  payerName                   String
+  ruleCategory                PayerRuleCategory
+  title                       String
+  description                 String?
+  medicationCatalogItemId     String?
+  clinicId                    String?
+  stateCode                   String?
+  serviceContext              String?
+  expectedReimbursementAmount Decimal?                 @db.Decimal(12, 2)
+  expectedReimbursementMin    Decimal?                 @db.Decimal(12, 2)
+  expectedReimbursementMax    Decimal?                 @db.Decimal(12, 2)
+  confidenceLevel             PayerRuleConfidenceLevel @default(MEDIUM)
+  sourceType                  PayerRuleSourceType      @default(MANUAL)
+  isActive                    Boolean                  @default(false)
+  effectiveDate               DateTime?
+  endDate                     DateTime?
+  createdByUserId             String
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+
+  organization          Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic                Clinic?                @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  medicationCatalogItem MedicationCatalogItem? @relation(fields: [medicationCatalogItemId], references: [id], onDelete: SetNull)
+  createdBy             User                   @relation("PayerRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  evidence              PayerRuleEvidence[]
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([payerName])
+  @@index([ruleCategory])
+  @@index([medicationCatalogItemId])
+  @@index([stateCode])
+  @@index([serviceContext])
+  @@index([isActive])
+  @@index([effectiveDate])
+  @@index([endDate])
+  @@index([createdAt])
+}
+
+model PayerRuleEvidence {
+  id              String   @id @default(cuid())
+  payerRuleId     String
+  documentId      String
+  sourceLabel     String?
+  note            String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  payerRule PayerRule @relation(fields: [payerRuleId], references: [id], onDelete: Cascade)
+  document  Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation("PayerRuleEvidenceCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([payerRuleId])
+  @@index([documentId])
+  @@index([createdByUserId])
+  @@index([createdAt])
+}
+
+model PayerRuleSuggestion {
+  id                String                    @id @default(cuid())
+  organizationId    String
+  payerName         String
+  suggestedRuleJSON Json
+  sourceDocumentId  String?
+  model             String
+  status            PayerRuleSuggestionStatus @default(DRAFT)
+  createdByUserId   String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceDocument Document?    @relation("PayerRuleSuggestionSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  createdBy      User?        @relation("PayerRuleSuggestionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([payerName])
+  @@index([sourceDocumentId])
+  @@index([status])
+  @@index([createdByUserId])
+  @@index([createdAt])
+}
+
+model AutomationRule {
+  id              String             @id @default(cuid())
+  organizationId  String
+  ruleType        AutomationRuleType
+  conditionConfig Json
+  actionConfig    Json
+  isActive        Boolean            @default(true)
+  createdByUserId String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User              @relation("AutomationRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  events       AutomationEvent[]
+
+  @@index([organizationId])
+  @@index([ruleType])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model AutomationEvent {
+  id                String                @id @default(cuid())
+  ruleId            String
+  organizationId    String
+  triggeredByUserId String?
+  triggeredAt       DateTime              @default(now())
+  targetEntityType  String
+  targetEntityId    String
+  actionExecuted    String
+  status            AutomationEventStatus @default(SUCCESS)
+  errorMessage      String?
+  metadata          Json?
+  createdAt         DateTime              @default(now())
+
+  rule         AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  triggeredBy  User?          @relation("AutomationEventTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([ruleId])
+  @@index([organizationId])
+  @@index([targetEntityType, targetEntityId])
+  @@index([status])
+  @@index([triggeredAt])
+  @@index([createdAt])
+}
+
+model RevenueOptimizationSignal {
+  id                  String                            @id @default(cuid())
+  organizationId      String
+  clinicId            String?
+  payerName           String?
+  reimbursementCaseId String?
+  signalType          RevenueOptimizationSignalType
+  signalSeverity      RevenueOptimizationSignalSeverity
+  recommendedAction   String
+  explanation         String
+  createdAt           DateTime                          @default(now())
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic            Clinic?            @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  reimbursementCase ReimbursementCase? @relation(fields: [reimbursementCaseId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([payerName])
+  @@index([reimbursementCaseId])
+  @@index([signalType])
+  @@index([signalSeverity])
+  @@index([createdAt])
+}
+
+model PredictiveSignal {
+  id               String               @id @default(cuid())
+  organizationId   String
+  clinicId         String?
+  payerName        String?
+  signalType       PredictiveSignalType
+  predictedOutcome String
+  confidenceScore  Float
+  explanation      String
+  createdAt        DateTime             @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clinic       Clinic?      @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([payerName])
+  @@index([signalType])
+  @@index([confidenceScore])
+  @@index([createdAt])
 }
 
 model AuditLog {

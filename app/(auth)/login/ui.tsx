@@ -18,6 +18,7 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+const isDevelopment = process.env.NODE_ENV === "development";
 
 const demoAccounts = [
   { label: "Super Admin", email: "superadmin@kalevea.local" },
@@ -31,10 +32,19 @@ const demoAccounts = [
   { label: "Read Only (Riverside)", email: "readonly@riverside.local" },
 ] as const;
 
+const authErrorMessages: Record<string, string> = {
+  ACCESS_PENDING: "Your account is pending activation. Please contact an administrator.",
+  NO_WORKSPACE_ACCESS: "No workspace access is configured for your account. Contact an administrator.",
+  ACCOUNT_INACTIVE: "Your account is inactive. Contact an administrator.",
+  AUTH_EMAIL_REQUIRED: "Your identity provider did not return an email address.",
+  INVITE_REVOKED: "Your invite has been revoked. Please contact an administrator.",
+};
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const next = searchParams.get("next") || "/dashboard";
+  const authErrorCode = searchParams.get("error");
 
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -94,6 +104,11 @@ export function LoginForm() {
           ) : null}
         </div>
 
+        {authErrorCode && authErrorMessages[authErrorCode] ? (
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            {authErrorMessages[authErrorCode]}
+          </p>
+        ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -101,24 +116,26 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-          Demo accounts (password: <span className="font-mono">password</span>)
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {demoAccounts.map((a) => (
-            <Button
-              key={a.email}
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => fillDemo(a.email)}
-            >
-              {a.label}
-            </Button>
-          ))}
+      {isDevelopment ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Demo accounts (password: <span className="font-mono">password</span>)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {demoAccounts.map((a) => (
+              <Button
+                key={a.email}
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => fillDemo(a.email)}
+              >
+                {a.label}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
