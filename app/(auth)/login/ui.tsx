@@ -12,12 +12,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const schema = z.object({
+const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
-type FormValues = z.infer<typeof schema>;
+const emailSchema = z.object({
+  email: z.string().email(),
+});
+
+type CredentialsFormValues = z.infer<typeof credentialsSchema>;
+type EmailFormValues = z.infer<typeof emailSchema>;
 const isDevelopment = process.env.NODE_ENV === "development";
 
 const demoAccounts = [
@@ -40,22 +45,31 @@ const authErrorMessages: Record<string, string> = {
   INVITE_REVOKED: "Your invite has been revoked. Please contact an administrator.",
 };
 
-export function LoginForm() {
+export function LoginForm(props: {
+  authProviderMode: "development_credentials" | "email" | "google" | "oidc";
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const next = searchParams.get("next") || "/dashboard";
   const authErrorCode = searchParams.get("error");
+  const isEmailMode = props.authProviderMode === "email";
 
   const [error, setError] = React.useState<string | null>(null);
+  const [info, setInfo] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const credentialsForm = useForm<CredentialsFormValues>({
+    resolver: zodResolver(credentialsSchema),
     defaultValues: { email: "", password: "" },
   });
+  const emailForm = useForm<EmailFormValues>({
+    resolver: zodResolver(emailSchema),
+    defaultValues: { email: "" },
+  });
 
-  async function onSubmit(values: FormValues) {
+  async function onCredentialsSubmit(values: CredentialsFormValues) {
     setError(null);
+    setInfo(null);
     setIsSubmitting(true);
 
     const res = await signIn("credentials", {
@@ -75,48 +89,94 @@ export function LoginForm() {
     router.replace(res.url ?? next);
   }
 
+  async function onEmailSubmit(values: EmailFormValues) {
+    setError(null);
+    setInfo(null);
+    setIsSubmitting(true);
+
+    const res = await signIn("email", {
+      email: values.email,
+      redirect: false,
+      callbackUrl: next,
+    });
+
+    setIsSubmitting(false);
+
+    if (!res?.ok) {
+      setError("Unable to send sign-in link. Please verify your email and try again.");
+      return;
+    }
+
+    setInfo("Check your email for a secure sign-in link.");
+  }
+
   function fillDemo(email: string) {
-    form.setValue("email", email, { shouldValidate: true });
-    form.setValue("password", "password", { shouldValidate: true });
+    credentialsForm.setValue("email", email, { shouldValidate: true });
+    credentialsForm.setValue("password", "password", { shouldValidate: true });
   }
 
   return (
     <div className="space-y-6">
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
-          {form.formState.errors.email?.message ? (
-            <p className="text-sm text-red-600">{form.formState.errors.email.message}</p>
+      {isEmailMode ? (
+        <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" autoComplete="email" {...emailForm.register("email")} />
+            {emailForm.formState.errors.email?.message ? (
+              <p className="text-sm text-red-600">{emailForm.formState.errors.email.message}</p>
+            ) : null}
+          </div>
+
+          {authErrorCode && authErrorMessages[authErrorCode] ? (
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {authErrorMessages[authErrorCode]}
+            </p>
           ) : null}
-        </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {info ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{info}</p> : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            {...form.register("password")}
-          />
-          {form.formState.errors.password?.message ? (
-            <p className="text-sm text-red-600">{form.formState.errors.password.message}</p>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting…" : "Send sign-in link"}
+          </Button>
+        </form>
+      ) : (
+        <form onSubmit={credentialsForm.handleSubmit(onCredentialsSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" autoComplete="email" {...credentialsForm.register("email")} />
+            {credentialsForm.formState.errors.email?.message ? (
+              <p className="text-sm text-red-600">{credentialsForm.formState.errors.email.message}</p>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              {...credentialsForm.register("password")}
+            />
+            {credentialsForm.formState.errors.password?.message ? (
+              <p className="text-sm text-red-600">{credentialsForm.formState.errors.password.message}</p>
+            ) : null}
+          </div>
+
+          {authErrorCode && authErrorMessages[authErrorCode] ? (
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {authErrorMessages[authErrorCode]}
+            </p>
           ) : null}
-        </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {info ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{info}</p> : null}
 
-        {authErrorCode && authErrorMessages[authErrorCode] ? (
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            {authErrorMessages[authErrorCode]}
-          </p>
-        ) : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting…" : "Sign in"}
+          </Button>
+        </form>
+      )}
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
-
-      {isDevelopment ? (
+      {isDevelopment && !isEmailMode ? (
         <div className="space-y-2">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
             Demo accounts (password: <span className="font-mono">password</span>)

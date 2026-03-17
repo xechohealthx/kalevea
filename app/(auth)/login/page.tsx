@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth/server";
+import { env } from "@/lib/env";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "./ui";
 
@@ -14,13 +15,15 @@ export default async function LoginPage() {
       <CardHeader>
         <CardTitle>Kalevea</CardTitle>
         <CardDescription>
-          {isDevelopment
-            ? "Sign in to the Kalevea Core platform (development auth enabled)."
-            : "Sign in to the Kalevea Core platform."}
+          {env.AUTH_PROVIDER_MODE === "email"
+            ? "Sign in to the Kalevea Core platform using a secure email magic link."
+            : isDevelopment
+              ? "Sign in to the Kalevea Core platform (development auth enabled)."
+              : "Sign in to the Kalevea Core platform."}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <LoginForm />
+        <LoginForm authProviderMode={env.AUTH_PROVIDER_MODE} />
       </CardContent>
     </Card>
   );
